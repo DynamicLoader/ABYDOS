@@ -2,13 +2,13 @@
 #ifndef __K_STRING_H__
 #define __K_STRING_H__
 
-#ifndef __cplusplus
-#include <sbi/sbi_types.h>
-#else
-using size_t = long;
+
+#ifdef __cplusplus
+// using size_t = long;
 extern "C"{
 #endif
 
+#include <sbi/sbi_types.h>
 /*
   Provides strcmp for the completeness of supporting string functions.
   it is not recommended to use strcmp() but use strncmp instead.

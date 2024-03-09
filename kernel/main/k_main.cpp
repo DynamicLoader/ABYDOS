@@ -2,6 +2,8 @@
 #include "k_main.h"
 #include "k_sbif.hpp"
 
+#include <containers>
+
 int k_main(int argc, const char *argv[])
 {
     SBIF::DebugCon dbg;

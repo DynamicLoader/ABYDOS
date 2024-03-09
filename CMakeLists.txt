@@ -19,7 +19,7 @@ set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 set(CMAKE_C_FLAGS "-g -Wall -Werror -ffreestanding -nostdlib -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIC")
-set(CMAKE_CXX_FLAGS "-g -Wall -Werror -ffreestanding -nostdlib -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls  -fno-exceptions -fPIC")
+set(CMAKE_CXX_FLAGS "-g -Wall -Werror -ffreestanding -nostdlib -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-exceptions -fPIC")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
 set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls -fpic")
@@ -34,6 +34,8 @@ add_executable(AbydOS_KNL ${KNL_SRC})
 
 target_include_directories(AbydOS_KNL 
     PUBLIC ${CMAKE_SOURCE_DIR}/opensbi/include
+    PUBLIC ${CMAKE_SOURCE_DIR}/kernel/inc
+    PUBLIC ${CMAKE_SOURCE_DIR}/kernel/stl
 )
 
 target_compile_options(AbydOS_KNL 

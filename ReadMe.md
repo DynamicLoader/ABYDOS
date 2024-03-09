@@ -8,7 +8,8 @@ AbydOS is a brand new operating system targeting RISC-V64, mainly based on C++.
 
 ## Dependencies
 
-- OpenSBI
+- [OpenSBI](https://github.com/riscv-software-src/opensbi)
+- [ArxContainer](https://github.com/hideakitai/ArxContainer)
 
 ## Build
 

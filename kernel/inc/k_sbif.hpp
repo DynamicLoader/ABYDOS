@@ -4,7 +4,14 @@
 extern "C"
 {
 #include "sbif.h"
+#define OPENSBI_EXTERNAL_SBI_TYPES k_types.h
+#include "riscv_asm.h"
+#include "sbi/riscv_encoding.h"
+
 #include "klibc.h" // This is to be removed in the future for isolation
+
+#undef OPENSBI_EXTERNAL_SBI_TYPES
+
 } // extern "C"
 
 using sbiret_t = struct sbiret;
