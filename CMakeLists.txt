@@ -37,7 +37,6 @@ add_executable(AbydOS_KNL ${KNL_SRC})
 target_include_directories(AbydOS_KNL 
     PUBLIC ${CMAKE_SOURCE_DIR}/opensbi/include
     PUBLIC ${CMAKE_SOURCE_DIR}/kernel/inc
-    PUBLIC ${CMAKE_SOURCE_DIR}/kernel/stl
 )
 
 target_compile_options(AbydOS_KNL 

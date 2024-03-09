@@ -1,11 +1,38 @@
-#include "k_cxxabi.h"
+/**
+ * @file k_cxxabi.cpp
+ * @author DynamicLoader
+ * @brief 
+ * @version 0.1
+ * @date 2024-03-09
+ * 
+ * @copyright Copyright (c) 2024
+
+   https://wiki.osdev.org/C++#GCC
+ * 
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifdef __cplusplus
+#define ATEXIT_MAX_FUNCS 128
+
 extern "C"
 {
-#endif
+
+    typedef unsigned uarch_t;
+    struct atexit_func_entry_t
+    {
+        /*
+         * Each member is at least 4 bytes large. Such that each entry is 12bytes.
+         * 128 * 12 = 1.5KB exact.
+         **/
+        void (*destructor_func)(void *);
+        void *obj_ptr;
+        void *dso_handle;
+    };
+
+    // int __cxa_atexit(void (*f)(void *), void *objptr, void *dso);
+    // void __cxa_finalize(void *f);
 
     atexit_func_entry_t __atexit_funcs[ATEXIT_MAX_FUNCS];
     uarch_t __atexit_func_count = 0;
@@ -121,10 +148,7 @@ extern "C"
     {
         return -1;
     }
-
-#ifdef __cplusplus
-};
-#endif
+}
 
 // Global memory allocator
 void *operator new(size_t size)

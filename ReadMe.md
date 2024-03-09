@@ -51,6 +51,19 @@ It's not necessary to build OpenSBI for a full installation of QEMU (-bios=defau
 qemu-system-riscv64 -M virt -m 256M -nographic -bios build/platform/generic/firmware/fw_jump.elf -kernel ../build/AbydOS_KNL
 ```
 
+To debug it, start the QEMU with gdb-stub like:
+
+```bash
+qemu-system-riscv64 -M virt -m 256M -nographic -bios build/platform/generic/firmware/fw_jump.elf -kernel ../build/AbydOS_KNL -gdb tcp::1234 -S
+```
+This will suspend until gdb attach and instruct it to continue; then in the secondary terminal, use:
+
+```bash
+gdb-multiarch ../build/AbydOS_KNL -ex 'target remote 127.0.0.1:1234'
+```
+
+to attach and debug.
+
 ## License
 
 Under BSD-3.
