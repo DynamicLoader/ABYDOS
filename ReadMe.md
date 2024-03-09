@@ -21,6 +21,10 @@ After installing the necessary packages, clone the repo and initialize the submo
 
 Then use CMake to configure and build. If everything goes well, you should get the kernel ELF `AbydOS_KNL` and its binary.
 
+**About the Toolchain**:
+
+The package from Ubuntu/Debian does not contain newlib or libstdc++. Therefore, it is required to use a full toolchain that supports them. Toolchains from [riscv-collab](https://github.com/riscv-collab/riscv-gnu-toolchain) are compiled with -mcmodel=medlow by default, which is not compatible with 0x80000000 as the kernel base. I have forked and compiled it with -mcmodel=medany [here](https://github.com/DynamicLoader/riscv-gnu-toolchain). If you need it, you can go to the actions for downloading.
+
 **Notes on configuring CMake:**
 
 Since `riscv64-unknown-elf-` does not target a normal system, it cannot pass the compiler test by CMake. Therefore, it is important to add these two command-line arguments to skip the test:

@@ -10,16 +10,32 @@
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
+_DRAM_BASE = 0x80000000;
+_KERNEL_OFFSET = 0x200000;
+_DRAM_SIZE = 64 * 1024 * 1024;
+_KERNEL_STACK_SIZE = 0x10000;
+
 SECTIONS
 {
 
-	. = 0x80000000 + 0x200000; /* For most case, starting from DDR by previous BL */
+	. = _DRAM_BASE + _KERNEL_OFFSET; /* For most case, starting from DDR by previous BL */
 
-	PROVIDE(_payload_start = .);
+	PROVIDE(_kernel_start = .);
 
 	. = ALIGN(0x1000); /* Need this to create proper sections */
 
 	/* Beginning of the code section */
+
+	.init :
+	{
+		_sinit = .;
+		. = ALIGN(8);
+		KEEP(*(SORT_NONE(.init)))
+		. = ALIGN(8);
+		_einit = .;
+	}
+
+	. = ALIGN(0x1000);
 
 	.text :
 	{
@@ -79,6 +95,23 @@ SECTIONS
 
 	. = ALIGN(0x1000); /* Ensure next section is page aligned */
 
+	/* Beginning of the read-write small data sections */
+
+	.sdata :
+	{
+		PROVIDE(_sdata_start = .);
+
+		*(.sdata)
+		*(.sdata.*)
+		*(.readmostly.sdata)
+		*(*.sdata)
+		. = ALIGN(8);
+
+		PROVIDE(_sdata_end = .);
+	}
+
+	. = ALIGN(0x1000); /* Ensure next section is page aligned */
+
 	.bss :
 	{
 		PROVIDE(_bss_start = .);
@@ -92,6 +125,29 @@ SECTIONS
 
 	. = ALIGN(0x1000); /* Need this to create proper sections */
 
-	PROVIDE(_payload_end = .);
+	.sbss :
+	{
+		PROVIDE(_sbss_start = .);
+		*(.sbss)
+		*(.sbss.*)
+		. = ALIGN(8);
+		PROVIDE(_sbss_end = .);
+	}
+
+	. = ALIGN(0x1000); /*Need this to create proper sections*/
+
+	PROVIDE(_kernel_end = .);
+
+	. = .+ _KERNEL_STACK_SIZE;
+
+	.heap : {
+        __heap_start__ = .;
+        end = __heap_start__;
+        _end = end;
+        __end = end;
+        KEEP(*(.heap))
+        __heap_end__ = .;
+        __HeapLimit = __heap_end__;
+    }
 
 }

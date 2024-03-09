@@ -82,8 +82,8 @@ _start_warm:
 	csrw	CSR_STVEC, a3
 
 	/* Setup stack */
-	lla	a3, _payload_end
-	li	a4, 0x2000
+	lla	a3, _kernel_end
+	lla	a4, _KERNEL_STACK_SIZE /* this is fake a address provided from ld */
 	add	sp, a3, a4
 
 	/* Jump to C main */

@@ -22,3 +22,12 @@ static const MemMapEntry virt_memmap[] = {
 };
 
 https://gitlab.com/qemu-project/qemu/-/blob/master/hw/riscv/virt.c?ref_type=heads
+
+findfp.c:(.text.global_stdio_init.part.0+0x2): relocation truncated to fit: R_RISCV_HI20 against `stdio_exit_handler'
+/opt/riscv/lib/gcc/riscv64-unknown-elf/13.2.0/../../../../riscv64-unknown-elf/lib/libc.a(libc_a-findfp.o): in function `__sfp':
+findfp.c:(.text.__sfp+0x0): relocation truncated to fit: R_RISCV_HI20 against symbol `__stdio_exit_handler' defined in .sbss.__stdio_exit_handler section in /opt/riscv/lib/gcc/riscv64-unknown-elf/13.2.0/../../../../riscv64-unknown-elf/lib/libc.a(libc_a-findfp.o)
+/opt/riscv/lib/gcc/riscv64-unknown-elf/13.2.0/../../../../riscv64-unknown-elf/lib/libc.a(libc_a-findfp.o): in function `__sinit':
+findfp.c:(.text.__sinit+0x6): additional relocation overflows omitted from the output
+
+
+sbrk.c:(.text._sbrk+0x14): undefined reference to `end'

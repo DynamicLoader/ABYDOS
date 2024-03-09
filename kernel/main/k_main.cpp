@@ -2,11 +2,26 @@
 #include "k_main.h"
 #include "k_sbif.hpp"
 
-#include <containers>
+
+
+// #include <containers>
+
+// class A{
+// public:
+//     ~A(){
+//         SBIF::DebugCon dbg;
+//         dbg.puts("Bye!");
+//     }   
+
+// void test(){}
+
+// };
 
 int k_main(int argc, const char *argv[])
 {
     SBIF::DebugCon dbg;
+    // A a;
+    // a.test();
     dbg.puts("cmd args: ");
     for (int i = 0; i < argc; ++i)
     {

@@ -8,7 +8,7 @@ extern "C"
 #include "riscv_asm.h"
 #include "sbi/riscv_encoding.h"
 
-#include "klibc.h" // This is to be removed in the future for isolation
+#include <cstring>
 
 #undef OPENSBI_EXTERNAL_SBI_TYPES
 

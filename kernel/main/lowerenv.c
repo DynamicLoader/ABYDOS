@@ -9,7 +9,9 @@
  * 
  */
 
-#include "klibc.h"
+#include <string.h>
+#include <stdio.h>
+
 #include "k_main.h"
 #include "sbif.h"
 
@@ -71,19 +73,14 @@ void k_before_main(unsigned long *pa0, unsigned long *pa1)
 {
     sbi_console_puts("\n===== Entered Test Kernel =====\n");
 
-    char buf[12];
-    int2str(*pa0, buf);
-    sbi_console_puts("a0: ");
+    char buf[64];
+    sprintf(buf, "a0: 0x%lx \t a1: 0x%lx\n",*pa0,*pa1);
     sbi_console_puts(buf);
-
-    int2str(*pa1, buf);
-    sbi_console_puts(" a1: ");
-    sbi_console_puts(buf);
-
-    sbi_console_puts("\n");
 
     if (*pa0 == 0)
         *pa0 = (unsigned long)default_args;
+
+    printf("test");
 }
 
 void k_after_main(int main_ret)
