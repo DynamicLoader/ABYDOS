@@ -3,8 +3,7 @@
 
 extern "C"
 {
-#include "sbif.h"
-#define OPENSBI_EXTERNAL_SBI_TYPES k_types.h
+#include "llenv.h"
 #include "riscv_asm.h"
 #include "sbi/riscv_encoding.h"
 

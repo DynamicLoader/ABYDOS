@@ -21,7 +21,7 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 # set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
 set(CMAKE_C_FLAGS "-g -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIC ")
-set(CMAKE_CXX_FLAGS "-g -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-exceptions -fPIC ")
+set(CMAKE_CXX_FLAGS "-g -Wall -Werror -ffunction-sections -fdata-sections  -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti -fPIC ")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
 set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls -fpic")
@@ -56,8 +56,12 @@ target_link_options(AbydOS_KNL
     # PUBLIC -Wl,--no-dynamic-linker 
     # PUBLIC -fno-pie -no-pie # overrides C_FLA
 
-    PUBLIC -T ${CMAKE_SOURCE_DIR}/kernel/main/test.elf.ldS
+    PUBLIC -T ${CMAKE_SOURCE_DIR}/kernel/main/kernel.ldS
 )
+
+# target_link_libraries(AbydOS_KNL
+#     PUBLIC -lsupc++
+# )
 
 add_custom_target(AbydOS_KNL_BIN ALL
     COMMAND ${Toolchain_Prefix}objcopy -S -O binary AbydOS_KNL AbydOS.bin

@@ -45,7 +45,11 @@ In VSCODE, it can be done by editing the `settings.json` and add the segment bel
 
 ## Testing
 
-It's not necessary to build OpenSBI for a full installation of QEMU (-bios=default). if you don't, please compile it with `PLATFORM=generic` then run the QEMU using the command in `1.sh` under directory `opensbi`.  
+It's not necessary to build OpenSBI for a full installation of QEMU (-bios=default). if you don't, please compile it with `PLATFORM=generic` then run the QEMU using the command in under `opensbi` directory:
+
+```bash
+qemu-system-riscv64 -M virt -m 256M -nographic -bios build/platform/generic/firmware/fw_jump.elf -kernel ../build/AbydOS_KNL
+```
 
 ## License
 

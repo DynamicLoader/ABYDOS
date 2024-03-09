@@ -1,6 +1,6 @@
 
-#ifndef __SBIF_H__
-#define __SBIF_H__
+#ifndef __LLENV_H__
+#define __LLENV_H__
 
 #include <sbi/sbi_ecall_interface.h>
 
@@ -14,4 +14,4 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0,
                         unsigned long arg3, unsigned long arg4,
                         unsigned long arg5);
 
-#endif // SBIF_H
+#endif

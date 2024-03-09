@@ -2,26 +2,52 @@
 #include "k_main.h"
 #include "k_sbif.hpp"
 
-
-
 // #include <containers>
 
-// class A{
-// public:
-//     ~A(){
-//         SBIF::DebugCon dbg;
-//         dbg.puts("Bye!");
-//     }   
+#include <cstdio>
+#include <iostream>
 
-// void test(){}
+SBIF::DebugCon dbg;
 
-// };
+class A
+{
+  public:
+    A()
+    {
+        dbg.puts("Hello from A!\n");
+    }
+
+    ~A()
+    {
+        dbg.puts("Bye!");
+    }
+
+    char *test()
+    {
+        std::cout << "Going to throw\n";
+
+        char *testp = new char[1048576];
+        if (!testp)
+            printf("Cannot malloc!");
+        testp[0] = 'a';
+        throw(int(1));
+        return testp;
+    }
+};
+
+A a;
 
 int k_main(int argc, const char *argv[])
 {
-    SBIF::DebugCon dbg;
-    // A a;
-    // a.test();
+    try
+    {
+        dbg.puts(a.test());
+    }
+    catch (...)
+    {
+        printf("Catched\n");
+    }
+
     dbg.puts("cmd args: ");
     for (int i = 0; i < argc; ++i)
     {
@@ -30,10 +56,5 @@ int k_main(int argc, const char *argv[])
         dbg.puts("' ");
     }
 
-    dbg.puts("\nTrying to shutdown...\n");
-    if (SBIF::SRST::reset(SBIF::SRST::Shutdown, SBIF::SRST::NoReason))
-    {
-        dbg.puts("Cannot shutdown!\n");
-    }
     return 0;
 }

@@ -43,14 +43,45 @@ SECTIONS
 		*(.entry)
 		*(.text)
 		*(.text.*)
+		*(.gcc.*)
+		*(.gcc_except_table.*)
 		. = ALIGN(8);
 		PROVIDE(_text_end = .);
 	}
 
+	. = ALIGN(0x1000);
+
+	.init_array :
+	{
+	  PROVIDE_HIDDEN (_init_array_start = .);
+	  KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+	  KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
+	  . = ALIGN(8);
+	  PROVIDE_HIDDEN (_init_array_end = .);
+	} 
+	
+	. = ALIGN(0x1000);
+
+	.fini_array :
+	{
+	  PROVIDE_HIDDEN (_fini_array_start = .);
+	  KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
+	  KEEP (*(.fini_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
+	  . = ALIGN(8);
+	  PROVIDE_HIDDEN (_fini_array_end = .);
+	} 
+
+	. = ALIGN(0x1000);
+
+	.eh_frame :
+	{
+		PROVIDE(__eh_frame_start = .);
+		*(.eh_frame);
+	}
+
 	/* End of the code sections */
 
-	. = ALIGN(0x1000); /* Ensure next section is page aligned */
-
+	. = ALIGN(0x1000);
 	/* Beginning of the read-only data sections */
 
 	.rodata :
@@ -61,17 +92,18 @@ SECTIONS
 		PROVIDE(_rodata_end = .);
 	}
 
-	.dynsym :
+	. = ALIGN(0x1000);
+
+	.srodata :
 	{
-		*(.dynsym)
-	}
-
-	. = ALIGN(0x1000); /* Ensure next section is page aligned */
-
-	.rela.dyn : {
-		PROVIDE(__rel_dyn_start = .);
-		*(.rela*)
-		PROVIDE(__rel_dyn_end = .);
+		PROVIDE(_srodata_start = .);
+    	*(.srodata.cst16)
+    	*(.srodata.cst8)
+    	*(.srodata.cst4)
+    	*(.srodata.cst2)
+    	*(.srodata .srodata.*)
+		. = ALIGN(8);
+		PROVIDE(_srodata_end = .);
 	}
 
 	/* End of the read-only data sections */
@@ -88,14 +120,10 @@ SECTIONS
 		*(.data.*)
 		*(.readmostly.data)
 		*(*.data)
-		. = ALIGN(8);
-
 		PROVIDE(_data_end = .);
 	}
 
 	. = ALIGN(0x1000); /* Ensure next section is page aligned */
-
-	/* Beginning of the read-write small data sections */
 
 	.sdata :
 	{
@@ -110,7 +138,7 @@ SECTIONS
 		PROVIDE(_sdata_end = .);
 	}
 
-	. = ALIGN(0x1000); /* Ensure next section is page aligned */
+	. = ALIGN(0x1000);
 
 	.bss :
 	{
