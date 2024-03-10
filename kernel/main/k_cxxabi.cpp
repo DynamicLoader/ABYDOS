@@ -46,9 +46,10 @@ extern "C"
 
     int __cxa_atexit(void (*f)(void *), void *objptr, void *dso)
     {
-        // printf("__cxa_atexit called\n");
+        printf("__cxa_atexit called\n");
         if (__atexit_func_count >= ATEXIT_MAX_FUNCS)
         {
+            printf("__cxa_atexit: no more room for functions\n");
             return -1;
         };
         __atexit_funcs[__atexit_func_count].destructor_func = f;
@@ -60,7 +61,7 @@ extern "C"
 
     void __cxa_finalize(void *f)
     {
-        // printf("__cxa_finalize called\n");
+        printf("__cxa_finalize called\n");
         uarch_t i = __atexit_func_count;
         if (!f)
         {

@@ -51,12 +51,12 @@ int k_main(int argc, const char *argv[])
         std::cout << "'" << argv[i] << "' ";
     std::cout << std::endl;
 
-    std::cout << "Please input something: " << std::flush;
+    // std::cout << "Please input something: " << std::flush;
 
-    auto uinput = getInput();
-    std::cout << std::endl << "U input: " << uinput << std::endl;
+    // auto uinput = getInput();
+    // std::cout << std::endl << "U input: " << uinput << std::endl;
 
-    auto ret = SBIF::SRST::reset(SBIF::SRST::WarmReboot, SBIF::SRST::NoReason);
-    std::cout << "Reset: " << SBIF::getErrorStr(ret) << std::endl;
+    // auto ret = SBIF::SRST::reset(SBIF::SRST::WarmReboot, SBIF::SRST::NoReason);
+    // std::cout << "Reset: " << SBIF::getErrorStr(ret) << std::endl;
     return 0;
 }

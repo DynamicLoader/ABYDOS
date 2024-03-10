@@ -18,11 +18,11 @@ class DriverBase
 {
   public:
     virtual bool probe(const char *devid) = 0;
-    virtual long registerDevice(const void *fdt) = 0; // returns handler
-    virtual void unregisterDevice(long handler) = 0;  // unregister device by handler
+    virtual long addDevice(const void *fdt) = 0; // returns handler
+    virtual void removeDevice(long handler) = 0;  // unregister device by handler
     virtual dev_type_t getDeviceType() = 0;
 
-    virtual ~DriverBase() = default;
+    // virtual ~DriverBase() = default;
 };
 
 void k_add_driver(DriverBase *drv);

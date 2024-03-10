@@ -104,7 +104,7 @@ void k_before_main(unsigned long pa0, unsigned long pa1)
     printf("\n===== Entered Test Kernel =====\n");
     printf("a0: 0x%lx \t a1: 0x%lx\n", pa0, pa1);
 
-    // Initialize drivers
+    // Initialize driver list
     extern void k_drv_init();
     k_drv_init();
 
@@ -117,12 +117,15 @@ void k_before_main(unsigned long pa0, unsigned long pa1)
 // kernel exit
 void k_after_main(int main_ret)
 {
-    printf("\nReached target k_after_main, clearing up...\n");
+    printf("\nReached k_after_main, clearing up...\n");
+
+    extern void __cxa_finalize(void *f); // in k_cxxabi.h
+    __cxa_finalize(NULL);
 
     for (__init_func_ptr *func = _fini_array_start; func != _fini_array_end; func++)
         (*func)();
 
-    // Cleanup drivers
+    // Cleanup driver list
     extern void k_drv_deinit();
     k_drv_deinit();
 

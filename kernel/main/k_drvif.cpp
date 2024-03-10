@@ -20,13 +20,7 @@ void k_drv_deinit()
 {
     printf("k_drv_deinit\n");
     if (k_drv_list != nullptr)
-    {
-        for (auto drv : *k_drv_list)
-        {
-            delete drv;
-        }
         delete k_drv_list;
-    }
 }
 
 } // extern "C"
