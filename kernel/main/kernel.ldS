@@ -13,7 +13,9 @@ ENTRY(_start)
 _DRAM_BASE = 0x80000000;
 _KERNEL_OFFSET = 0x200000;
 _DRAM_SIZE = 64 * 1024 * 1024;
-_KERNEL_STACK_SIZE = 0x10000;
+
+/* Temporary stack size, this will get overlapped with heap. Only used in early boot funcs */
+_KERNEL_BOOT_STACK_SIZE = 0x2000; 
 
 SECTIONS
 {
@@ -88,11 +90,17 @@ SECTIONS
 	{
 		PROVIDE(_rodata_start = .);
 		*(.rodata .rodata.*)
+
+		*(.srodata.cst16)
+    	*(.srodata.cst8)
+    	*(.srodata.cst4)
+    	*(.srodata.cst2)
+    	*(.srodata .srodata.*)
 		. = ALIGN(8);
 		PROVIDE(_rodata_end = .);
 	}
 
-	. = ALIGN(0x1000);
+	/* . = ALIGN(0x1000);
 
 	.srodata :
 	{
@@ -104,7 +112,7 @@ SECTIONS
     	*(.srodata .srodata.*)
 		. = ALIGN(8);
 		PROVIDE(_srodata_end = .);
-	}
+	} */
 
 	/* End of the read-only data sections */
 
@@ -120,12 +128,18 @@ SECTIONS
 		*(.data.*)
 		*(.readmostly.data)
 		*(*.data)
+
+		*(.sdata)
+		*(.sdata.*)
+		*(.readmostly.sdata)
+		*(*.sdata)
+		. = ALIGN(8);
 		PROVIDE(_data_end = .);
 	}
 
 	. = ALIGN(0x1000); /* Ensure next section is page aligned */
 
-	.sdata :
+	/* .sdata :
 	{
 		PROVIDE(_sdata_start = .);
 
@@ -138,13 +152,17 @@ SECTIONS
 		PROVIDE(_sdata_end = .);
 	}
 
-	. = ALIGN(0x1000);
+	. = ALIGN(0x1000); */
 
 	.bss :
 	{
 		PROVIDE(_bss_start = .);
 		*(.bss)
 		*(.bss.*)
+
+		*(.sbss)
+		*(.sbss.*)
+
 		. = ALIGN(8);
 		PROVIDE(_bss_end = .);
 	}
@@ -153,7 +171,7 @@ SECTIONS
 
 	. = ALIGN(0x1000); /* Need this to create proper sections */
 
-	.sbss :
+	/* .sbss :
 	{
 		PROVIDE(_sbss_start = .);
 		*(.sbss)
@@ -162,20 +180,24 @@ SECTIONS
 		PROVIDE(_sbss_end = .);
 	}
 
-	. = ALIGN(0x1000); /*Need this to create proper sections*/
+	. = ALIGN(0x1000); */
 
 	PROVIDE(_kernel_end = .);
 
-	. = .+ _KERNEL_STACK_SIZE;
+	/* Provide heap end  */
+	__heap_start__ = .;
+    end = __heap_start__;
 
-	.heap : {
-        __heap_start__ = .;
-        end = __heap_start__;
+
+	/* . = .+ _KERNEL_STACK_SIZE; */
+
+	/* .heap : {
+        
         _end = end;
         __end = end;
         KEEP(*(.heap))
         __heap_end__ = .;
         __HeapLimit = __heap_end__;
-    }
+    } */
 
 }

@@ -11,27 +11,18 @@
  *
  */
 
-#include <string.h>
 #include <stdio.h>
 
 #include "k_main.h"
 #include "llenv.h"
 
-const char default_args[] = "--test -tty serial";
+char default_args[] = "--test -tty serial";
 const char *kernel_cmdargs[128] = {0};
 int kernel_cmdargc = 0;
 
 typedef void (*__init_func_ptr)();
 extern __init_func_ptr _init_array_start[0], _init_array_end[0];
 extern __init_func_ptr _fini_array_start[0], _fini_array_end[0];
-
-void _init(void)
-{
-}
-
-void _fini(void)
-{
-}
 
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
                         unsigned long arg3, unsigned long arg4, unsigned long arg5)
@@ -52,6 +43,30 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1
 
     return ret;
 }
+
+// void *_sbrk(ptrdiff_t incr)
+// {
+//     extern char end asm("end"); /* Defined by the linker.  */
+//     static char *heap_end;
+//     char *prev_heap_end;
+
+//     if (heap_end == NULL)
+//         heap_end = &end;
+
+//     prev_heap_end = heap_end;
+
+//     if ((heap_end + incr > stack_ptr)
+//         /* Honour heap limit if it's valid.  */
+//         || (__heap_limit != 0xcafedead && heap_end + incr > (char *)__heap_limit))
+//     {
+//         extern errno = ENOMEM;
+//         return (void *)-1;
+//     }
+
+//     heap_end += incr;
+
+//     return (void *)prev_heap_end;
+// }
 
 // Hook with libc
 int _write(int fd, char *buf, int size)
@@ -84,18 +99,19 @@ static int split_args(char *in, const char **out) // Out of buffer to be fixed
 }
 
 // kernel init
-void k_before_main(unsigned long *pa0, unsigned long *pa1)
+void k_before_main(unsigned long pa0, unsigned long pa1)
 {
     printf("\n===== Entered Test Kernel =====\n");
-    printf("a0: 0x%lx \t a1: 0x%lx\n", *pa0, *pa1);
+    printf("a0: 0x%lx \t a1: 0x%lx\n", pa0, pa1);
 
+    // Initialize drivers
+    extern void k_drv_init();
+    k_drv_init();
+
+    // Call global constructors
     printf("Calling init_array...\n");
     for (__init_func_ptr *func = _init_array_start; func != _init_array_end; func++)
         (*func)();
-
-    // No args, use default
-    if (*pa0 == 0)
-        *pa0 = (unsigned long)default_args;
 }
 
 // kernel exit
@@ -106,30 +122,41 @@ void k_after_main(int main_ret)
     for (__init_func_ptr *func = _fini_array_start; func != _fini_array_end; func++)
         (*func)();
 
-    printf("===== Test Kernel exited with %i =====\n", main_ret);
-}
+    // Cleanup drivers
+    extern void k_drv_deinit();
+    k_drv_deinit();
 
-// Prepare C++ environment
-void k_prep_cxx()
-{
-    // init C++ exceptions
-    extern void *__eh_frame_start;
-    extern void __register_frame(void *); // not knowing the prototype of __register_frame, guess and OK!
-    __register_frame(&__eh_frame_start);
+    printf("===== Test Kernel exited with %i =====\n", main_ret);
 }
 
 void k_cstart(unsigned long a0, unsigned long a1) // To be called from prepC.S
 {
-    k_before_main(&a0, &a1);
+    k_before_main(a0, a1);
 
     // Parse Kerenl command line args
-    kernel_cmdargc = split_args((char *)a0, kernel_cmdargs);
-
-    // init C++ exceptions
-    k_prep_cxx();
+    kernel_cmdargc = split_args((char *)default_args, kernel_cmdargs);
 
     int ret = k_main(kernel_cmdargc, kernel_cmdargs);
 
     k_after_main(ret);
     // After exit from here, infini loop in asm...
 }
+
+// To be called from prepC.S of early boot age, only once when cold boot
+// Note that here we have limited stack (8KB by default) and 
+// hardly no heap (If you can promise the heap to be allocated in a small size), be careful!
+long k_early_boot(const unsigned long hart_id, const void *dtb_addr,void** sys_stack_base)
+{
+    // detect system memory size
+
+    // calc the system stack base
+    *sys_stack_base = (void*) 0x80000000 + 1048576 * 64;
+
+    // init C++ exceptions
+    extern void *__eh_frame_start;
+    extern void __register_frame(void *); // not knowing the prototype of __register_frame, guess and OK!
+    __register_frame(&__eh_frame_start);
+
+    return 0; // Non-zero to indicate error and hang the system
+}
+

@@ -48,6 +48,23 @@ _bss_zero:
 	add	a4, a4, __SIZEOF_POINTER__
 	blt	a4, a5, _bss_zero
 
+	/* Setup boot C stack */
+	lla	a3, _kernel_end
+	lla	a4, _KERNEL_BOOT_STACK_SIZE /* this is fake a address provided from ld */
+	add	sp, a3, a4
+	lla a3, _sys_stack_base
+	REG_S	sp, 0(a3)
+
+	/* Early boot in C */
+	lla	a3, _boot_a0
+	REG_L	a0, 0(a3)
+	lla	a3, _boot_a1
+	REG_L	a1, 0(a3)
+	lla a2, _sys_stack_base
+	call k_early_boot
+
+	bne a0, zero, _start_hang 
+
 	/* relocate  */
 # 	lla	t0, _link_start
 # 	REG_L	t0, 0(t0)
@@ -81,10 +98,9 @@ _start_warm:
 	lla	a3, _start_hang
 	csrw	CSR_STVEC, a3
 
-	/* Setup stack */
-	lla	a3, _kernel_end
-	lla	a4, _KERNEL_STACK_SIZE /* this is fake a address provided from ld */
-	add	sp, a3, a4
+	/* Setup system stack base */
+	lla a3, _sys_stack_base
+	REG_L sp, 0(a3)
 
 	/* Jump to C main */
 	lla	a3, _boot_a0
@@ -112,8 +128,9 @@ _hart_lottery:
 	RISCV_PTR	0
 # _link_start:
 # 	RISCV_PTR	_payload_start
-_boot_a0:
+_boot_a0:  // hart id
 	RISCV_PTR	0
-_boot_a1:
+_boot_a1: // dtb address
 	RISCV_PTR	0
-
+_sys_stack_base:
+	RISCV_PTR	0

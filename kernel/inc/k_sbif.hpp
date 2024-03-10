@@ -4,12 +4,12 @@
 extern "C"
 {
 #include "llenv.h"
-#include "riscv_asm.h"
-#include "sbi/riscv_encoding.h"
+// #include "riscv_asm.h"
+// #include "sbi/riscv_encoding.h"
 
 #include <cstring>
 
-#undef OPENSBI_EXTERNAL_SBI_TYPES
+// #undef OPENSBI_EXTERNAL_SBI_TYPES
 
 } // extern "C"
 
@@ -90,7 +90,7 @@ class SBIF
             return CSBI(SBI_EXT_DBCN_CONSOLE_WRITE, strlen(str), (unsigned long)str).error;
         }
 
-        static long gets(char *str, unsigned long mlen)
+        static auto gets(char *str, unsigned long mlen)
         {
             auto ret = CSBI(SBI_EXT_DBCN_CONSOLE_READ, mlen, (unsigned long)str);
             return (ret.error == SBI_SUCCESS ? ret.value : ret.error);
@@ -166,6 +166,25 @@ class SBIF
             return CSBI(SBI_EXT_SRST_RESET, reset_type, reason).error;
         }
     };
-};
 
+    static const char *getErrorStr(long err)
+    {
+        const char *err_str[] = {"SBI_SUCCESS",
+                                 "SBI_ERR_FAILED",
+                                 "SBI_ERR_NOT_SUPPORTED",
+                                 "SBI_ERR_INVALID_PARAM",
+                                 "SBI_ERR_DENIED",
+                                 "SBI_ERR_INVALID_ADDRESS",
+                                 "SBI_ERR_ALREADY_AVAILABLE",
+                                 "SBI_ERR_ALREADY_STARTED",
+                                 "SBI_ERR_ALREADY_STOPPED",
+                                 "SBI_ERR_NO_SHMEM"};
+        if (err >= 0)
+            return err_str[0];
+        else if (err < 0 and err > -10)
+            return err_str[-err];
+        else
+            return "SBI_ERR_UNKNOWN";
+    }
+};
 #endif

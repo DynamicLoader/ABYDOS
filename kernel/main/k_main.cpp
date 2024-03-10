@@ -1,60 +1,62 @@
 
+#include <iostream>
+#include <string>
+
+
 #include "k_main.h"
 #include "k_sbif.hpp"
+#include "k_drvif.h"
 
-// #include <containers>
 
-#include <cstdio>
-#include <iostream>
 
 SBIF::DebugCon dbg;
 
-class A
+std::string getInput(bool echo = true)
 {
-  public:
-    A()
+    char tmp[64] = {0};
+    std::string uinput;
+    long ret = 0;
+    while (true)
     {
-        dbg.puts("Hello from A!\n");
+        ret = dbg.gets(tmp, 64);
+        if (ret == 0)
+            continue;
+
+        if (ret > 0)
+        {
+            for (int i = 0; i < ret; ++i)
+            {
+                uinput += tmp[i];
+                if (echo)
+                {
+                    std::cout << tmp[i];
+                    std::cout.flush();
+                }
+                if (tmp[i] == '\n' || tmp[i] == '\r')
+                    return uinput;
+            }
+        }
+        else
+        {
+            std::cout << "Error: " << SBIF::getErrorStr(ret) << std::endl;
+            return "";
+        }
     }
-
-    ~A()
-    {
-        dbg.puts("Bye!");
-    }
-
-    char *test()
-    {
-        std::cout << "Going to throw\n";
-
-        char *testp = new char[1048576];
-        if (!testp)
-            printf("Cannot malloc!");
-        testp[0] = 'a';
-        throw(int(1));
-        return testp;
-    }
-};
-
-A a;
+}
 
 int k_main(int argc, const char *argv[])
 {
-    try
-    {
-        dbg.puts(a.test());
-    }
-    catch (...)
-    {
-        printf("Catched\n");
-    }
-
-    dbg.puts("cmd args: ");
+    std::cout << "cmd args: ";
     for (int i = 0; i < argc; ++i)
-    {
-        dbg.puts("'");
-        dbg.puts(argv[i]);
-        dbg.puts("' ");
-    }
+        std::cout << "'" << argv[i] << "' ";
+    std::cout << std::endl;
 
+    std::cout << "Please input something: " << std::flush;
+
+    auto uinput = getInput();
+    std::cout << std::endl << "U input: " << uinput << std::endl;
+
+    auto ret = SBIF::SRST::reset(SBIF::SRST::WarmReboot, SBIF::SRST::NoReason);
+    std::cout << "Reset: " << SBIF::getErrorStr(ret) << std::endl;
     return 0;
 }

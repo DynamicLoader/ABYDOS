@@ -40,13 +40,13 @@ extern "C"
     // We do not use dynamic for now
     void *__dso_handle()
     {
-        printf("__dso_handle called\n");
+        // printf("__dso_handle called\n");
         return nullptr;
     }
 
     int __cxa_atexit(void (*f)(void *), void *objptr, void *dso)
     {
-        printf("__cxa_atexit called\n");
+        // printf("__cxa_atexit called\n");
         if (__atexit_func_count >= ATEXIT_MAX_FUNCS)
         {
             return -1;
@@ -60,7 +60,7 @@ extern "C"
 
     void __cxa_finalize(void *f)
     {
-        printf("__cxa_finalize called\n");
+        // printf("__cxa_finalize called\n");
         uarch_t i = __atexit_func_count;
         if (!f)
         {
@@ -141,32 +141,32 @@ extern "C"
     void __cxa_pure_virtual()
     {
         // Do nothing or print an error message.
-        printf("Pure virtual function called\n");
+        // printf("Pure virtual function called\n");
     }
 
-    int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data)
-    {
-        return -1;
-    }
+    // int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data)
+    // {
+    //     return -1;
+    // }
 }
 
 // Global memory allocator
-void *operator new(size_t size)
-{
-    return malloc(size);
-}
+// void *operator new(size_t size)
+// {
+//     return malloc(size);
+// }
 
-void *operator new[](size_t size)
-{
-    return malloc(size);
-}
+// void *operator new[](size_t size)
+// {
+//     return malloc(size);
+// }
 
-void operator delete(void *p)
-{
-    free(p);
-}
+// void operator delete(void *p)
+// {
+//     free(p);
+// }
 
-void operator delete[](void *p)
-{
-    free(p);
-}
+// void operator delete[](void *p)
+// {
+//     free(p);
+// }
