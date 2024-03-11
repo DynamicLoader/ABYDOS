@@ -105,8 +105,8 @@ _start_warm:
 	/* Jump to C main */
 	lla	a3, _boot_a0
 	REG_L	a0, 0(a3)
-	lla	a3, _boot_a1
-	REG_L	a1, 0(a3)
+	# lla	a3, _boot_a1
+	# REG_L	a1, 0(a3)
 	call	k_cstart /* start kernel */
 
 	/* We don't expect to reach here hence just hang */

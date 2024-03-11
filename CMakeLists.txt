@@ -35,6 +35,9 @@ file(GLOB KNL_SRC
     # builtin drivers
     ${CMAKE_SOURCE_DIR}/kernel/driver/*.c
     ${CMAKE_SOURCE_DIR}/kernel/driver/*.cpp
+
+    # libfdt
+    ${CMAKE_SOURCE_DIR}/deps/libfdt/*.c
 )
 
 add_executable(AbydOS_KNL ${KNL_SRC})
@@ -42,13 +45,14 @@ add_executable(AbydOS_KNL ${KNL_SRC})
 target_include_directories(AbydOS_KNL 
     PUBLIC ${CMAKE_SOURCE_DIR}/opensbi/include
     PUBLIC ${CMAKE_SOURCE_DIR}/kernel/inc
+    PUBLIC ${CMAKE_SOURCE_DIR}/deps/libfdt/
 )
 
 target_compile_options(AbydOS_KNL 
     PUBLIC -mabi=${PL_ABI}
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
-
+    # PUBLIC -DDEBUG
     # PUBLIC -D_KERNEL_STACK_SIZE=${KernelStackSize}
 )
 
