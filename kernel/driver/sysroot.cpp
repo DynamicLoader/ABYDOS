@@ -1,9 +1,9 @@
 /**
- * @file uart8250.cpp
+ * @file sysroot.cpp
  * @author DynamicLoader
- * @brief UART8250 Driver
+ * @brief SYS Root Driver, base board and "chosen device"
  * @version 0.1
- * @date 2024-03-10
+ * @date 2024-03-11
  *
  * @copyright Copyright (c) 2024
  *
@@ -15,21 +15,18 @@
 
 static void drv_register();
 
-class Drv_Uart8250 : public DriverBase
+class SysRoot : public DriverBase
 {
   public:
-    // Drv_Uart8250()
-    // {
-    //     printf("Driver constructed\n");
-    // }
-
     int probe(const char *name, const char *compatible) override
     {
         std::string id = name;
-        if (id.find("uart") == std::string::npos)
-            return DRV_CAP_NONE;
-        id = compatible;
-        return (id == "ns16550" || id == "ns16550a" || id == "snps,dw-apb-uart") ? DRV_CAP_THIS : DRV_CAP_NONE;
+        // printf("[Sysmem] %s %s\n",name,compatible);
+        if (id == "chosen")
+            return DRV_CAP_COVER;
+        if (id == "" && std::string(compatible).find("riscv") != std::string::npos)
+            return DRV_CAP_THIS;
+        return DRV_CAP_NONE;
     }
 
     long addDevice(const void *fdt) override
@@ -41,28 +38,22 @@ class Drv_Uart8250 : public DriverBase
     }
     dev_type_t getDeviceType() override
     {
-        return DEV_TYPE_CHAR;
+        return DEV_TYPE_SYS;
     }
-
-    // Remained devices should be closed in the destructor
-    // ~Drv_Uart8250()
-    // {
-    //     printf("Driver destructed\n");
-    // }
 
   private:
     static int hdl_count;
     friend void drv_register();
 };
 
-int Drv_Uart8250::hdl_count = -1;
+int SysRoot::hdl_count = -1;
 
 // We make a static instance of our driver, initialize and register it
 // Note that devices should be handled inside the class, not here
-static DRV_INSTALL_FUNC(300) void drv_register()
+static DRV_INSTALL_FUNC(200) void drv_register()
 {
-    static Drv_Uart8250 drv;
+    static SysRoot drv;
     drv.hdl_count = 0;
     DriverManager::addDriver(drv);
-    printf("Driver UART8250 installed\n");
+    printf("Driver SysRoot installed\n");
 }

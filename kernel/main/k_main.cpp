@@ -51,6 +51,9 @@ int k_main(int argc, const char *argv[])
         std::cout << "'" << argv[i] << "' ";
     std::cout << std::endl;
 
+    // Probing devices
+    DriverManager::probe(k_fdt);
+
     // std::cout << "Please input something: " << std::flush;
 
     // auto uinput = getInput();

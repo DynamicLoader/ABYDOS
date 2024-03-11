@@ -52,31 +52,31 @@ int _write(int fd, char *buf, int size)
     return size;
 }
 
-// void *_sbrk(ptrdiff_t incr)
-// {
-//     _write(1, "_sbrk called\n", 14);
+void *_sbrk(ptrdiff_t incr)
+{
+    _write(1, "_sbrk called\n", 14);
 
-//     extern char end asm("end"); /* Defined by the linker.  */
-//     static char *heap_end;
-//     char *prev_heap_end;
+    extern char end asm("end"); /* Defined by the linker.  */
+    static char *heap_end;
+    char *prev_heap_end;
 
-//     if (heap_end == NULL)
-//         heap_end = &end;
+    if (heap_end == NULL)
+        heap_end = &end;
 
-//     prev_heap_end = heap_end;
+    prev_heap_end = heap_end;
 
-//     // if ((heap_end + incr > stack_ptr)
-//     //     /* Honour heap limit if it's valid.  */
-//     //     || (__heap_limit != 0xcafedead && heap_end + incr > (char *)__heap_limit))
-//     // {
-//     //     extern errno = ENOMEM;
-//     //     return (void *)-1;
-//     // }
+    // if ((heap_end + incr > stack_ptr)
+    //     /* Honour heap limit if it's valid.  */
+    //     || (__heap_limit != 0xcafedead && heap_end + incr > (char *)__heap_limit))
+    // {
+    //     extern errno = ENOMEM;
+    //     return (void *)-1;
+    // }
 
-//     heap_end += incr;
+    heap_end += incr;
 
-//     return (void *)prev_heap_end;
-// }
+    return (void *)prev_heap_end;
+}
 
 static int split_args(char *in, const char **out) // Out of buffer to be fixed
 {
@@ -107,9 +107,10 @@ void k_before_main(unsigned long pa0)
     printf("\n===== Entered Test Kernel =====\n");
     printf("a0: 0x%lx\n", pa0);
 
-    // Initialize driver list
-    // extern void k_drv_init();
-    // k_drv_init();
+    // init C++ exceptions
+    extern void *__eh_frame_start;
+    extern void __register_frame(void *); // not knowing the prototype of __register_frame, guess and OK!
+    __register_frame(&__eh_frame_start);
 
     // Call global constructors
     printf("Calling init_array...\n");
@@ -131,10 +132,6 @@ void k_after_main(int main_ret)
     extern __init_func_ptr _fini_array_start[0], _fini_array_end[0];
     for (__init_func_ptr *func = _fini_array_start; func != _fini_array_end; func++)
         (*func)();
-
-    // Cleanup driver list
-    // extern void k_drv_deinit();
-    // k_drv_deinit();
 
     printf("===== Test Kernel exited with %i =====\n", main_ret);
 }
@@ -391,11 +388,6 @@ long k_early_boot(const unsigned long hart_id, const void *dtb_addr, void **sys_
 
     *sys_stack_base = (void *)(mem_start + k_mem_size);
     printf("[EBOOT] Set SYS_SP: 0x%lx\n", (unsigned long)*sys_stack_base);
-
-    // init C++ exceptions
-    extern void *__eh_frame_start;
-    extern void __register_frame(void *); // not knowing the prototype of __register_frame, guess and OK!
-    __register_frame(&__eh_frame_start);
 
     return 0; // Non-zero to indicate error and hang the system
 }
