@@ -11,13 +11,13 @@
 
 #include "k_sysdev.h"
 
-class GenericRoot : public SysRoot
+class VirtRoot : public SysRoot
 {
   public:
     int probe(const char *name, const char *compatible) override
     {
         std::string id = name;
-        if (id == "")
+        if (id == "" && std::string(compatible) == "riscv-virtio")
             return DRV_CAP_THIS;
         return DRV_CAP_NONE;
     }
@@ -29,30 +29,28 @@ class GenericRoot : public SysRoot
         {
             auto prop = fdt_get_property(fdt, node, "compatible", &len);
             if (!prop)
-                _compatible = "Generic";
-            else
-                _compatible = std::string(prop->data);
+                return K_ENOENT;
+            _compatible = std::string(prop->data);
             prop = fdt_get_property(fdt, node, "model", &len);
             if (!prop)
-                _model = "Generic";
-            else
-                _model = std::string(prop->data);
+                return K_ENOENT;
+            _model = std::string(prop->data);
 
+            // const char *name = fdt_get_name(fdt, node, &len);
             auto rc = fdt_path_offset(fdt, "/chosen"); // property of chosen node may diff on other platform
             if (rc >= 0)
             {
                 auto prop = fdt_get_property(fdt, rc, "stdout-path", &len);
                 if (prop)
                     _stdout_path = std::string(prop->data);
-                DriverManager::alsoInstalled(fdt, rc, 0, this,DRV_CAP_THIS); // mark as installed
-
-                return 0; // singleton device
+                DriverManager::alsoInstalled(fdt, rc, 0, this, DRV_CAP_THIS); // mark as installed
             }
+
+            return 0; // singleton device
         }
 
         return K_ENODEV;
     }
-
     void removeDevice(long handler) override
     {
     }
@@ -64,9 +62,9 @@ class GenericRoot : public SysRoot
 
 // We make a static instance of our driver, initialize and register it
 // Note that devices should be handled inside the class, not here
-static DRV_INSTALL_FUNC(K_PR_DRV_SYSROOT_END) void drv_register()
+static DRV_INSTALL_FUNC(K_PR_DRV_SYSROOT_BEGIN + 1) void drv_register()
 {
-    static GenericRoot drv;
+    static VirtRoot drv;
     DriverManager::addDriver(drv);
-    printf("Driver GenericRoot installed\n");
+    printf("Driver VirtRoot installed\n");
 }

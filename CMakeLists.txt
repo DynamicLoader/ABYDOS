@@ -35,6 +35,8 @@ file(GLOB KNL_SRC
     # builtin drivers
     ${CMAKE_SOURCE_DIR}/kernel/driver/*.c
     ${CMAKE_SOURCE_DIR}/kernel/driver/*.cpp
+    ${CMAKE_SOURCE_DIR}/kernel/driver/*/*.c
+    ${CMAKE_SOURCE_DIR}/kernel/driver/*/*.cpp
 
     # libfdt
     ${CMAKE_SOURCE_DIR}/deps/libfdt/*.c

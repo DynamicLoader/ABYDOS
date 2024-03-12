@@ -45,12 +45,8 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1
     return ret;
 }
 
-// Hook with libc
-int _write(int fd, char *buf, int size)
-{
-    sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf, 0, 0, 0, 0);
-    return size;
-}
+extern int _write(int fd, char *buf, int size);
+extern bool k_stdout_switched;
 
 void *_sbrk(ptrdiff_t incr)
 {
@@ -123,6 +119,7 @@ void k_before_main(unsigned long pa0)
 // kernel exit
 void k_after_main(int main_ret)
 {
+    k_stdout_switched = false; // switching back to default stdout
     printf("\nReached k_after_main, clearing up...\n");
 
     extern void __cxa_finalize(void *f); // in k_cxxabi.h
@@ -243,20 +240,6 @@ static void print_node(const void *fdt, int node, int depth)
 
 #endif
 
-uint64_t be2le64(const uint64_t value)
-{
-    return ((value & 0xFF00000000000000) >> 56) | ((value & 0x00FF000000000000) >> 40) |
-           ((value & 0x0000FF0000000000) >> 24) | ((value & 0x000000FF00000000) >> 8) |
-           ((value & 0x00000000FF000000) << 8) | ((value & 0x0000000000FF0000) << 24) |
-           ((value & 0x000000000000FF00) << 40) | ((value & 0x00000000000000FF) << 56);
-}
-
-uint32_t be2le(const uint32_t value)
-{
-    return ((value & 0xFF000000) >> 24) | ((value & 0x00FF0000) >> 8) | ((value & 0x0000FF00) << 8) |
-           ((value & 0x000000FF) << 24);
-}
-
 // To be called from prepC.S of early boot age, only once when cold boot
 // Note that here we have limited stack and heap (Totally 64KB by default), be careful!
 long k_early_boot(const unsigned long hart_id, const void *dtb_addr, void **sys_stack_base)
@@ -295,8 +278,8 @@ long k_early_boot(const unsigned long hart_id, const void *dtb_addr, void **sys_
         return -4;
     }
 
-    unsigned long mem_start = be2le64(((const unsigned long *)memreg)[0]);
-    unsigned long mem_len = be2le64(((const unsigned long *)memreg)[1]);
+    unsigned long mem_start = fdt64_to_cpu(((const unsigned long *)memreg)[0]);
+    unsigned long mem_len = fdt64_to_cpu(((const unsigned long *)memreg)[1]);
 
     printf("[EBOOT] Memory Range: base= 0x%lx, len= 0x%lx\n", mem_start, mem_len);
 

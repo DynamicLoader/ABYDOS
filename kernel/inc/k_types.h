@@ -1,7 +1,7 @@
 #ifndef __K_TYPES_H__
 #define __K_TYPES_H__
 
-// Compitiable with OpenSBI and C++ for RISCV_64
+// Compitiable with OpenSBI and C, C++ for RISCV_64
 
 #if __riscv_xlen == 32
 #error "32-bit RISC-V is not supported"
@@ -43,6 +43,8 @@ typedef uint32_t		be32_t;
 typedef uint64_t		le64_t;
 typedef uint64_t		be64_t;
 
+#ifndef __cplusplus
+
 #define __packed		__attribute__((packed))
 #define __noreturn		__attribute__((noreturn))
 #define __aligned(x)		__attribute__((aligned(x)))
@@ -50,5 +52,7 @@ typedef uint64_t		be64_t;
 
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
+
+#endif
 
 #endif

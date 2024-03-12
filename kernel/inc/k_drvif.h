@@ -8,28 +8,52 @@
 
 typedef enum
 {
-    DEV_TYPE_SYS = 1,
-    DEV_TYPE_CHAR = 0x80,
+    DEV_TYPE_NONE = 0,
+    DEV_TYPE_SYS,
+    DEV_TYPE_PERIP = 0x80,
+    DEV_TYPE_CHAR,
     DEV_TYPE_BLOCK,
 } dev_type_t;
 
 #ifdef __cplusplus
 
 #include <vector>
+#include <map>
+
+extern "C"
+{
+#include "fdt_helper.h"
+}
 
 class DriverBase
 {
   public:
-  // Returns 1 if driver can handle this device, or 2 for cover-all driver (will stop probing for sub nodes)
+    // Returns 1 if driver can handle this device, or 2 for cover-all driver (will stop probing for sub nodes)
     virtual int probe(const char *name, const char *compatible) = 0;
-    virtual long addDevice(const void *fdt) = 0; // returns handler
-    virtual void removeDevice(long handler) = 0; // unregister device by handler
+    virtual long addDevice(const void *fdt, int node) = 0; // returns handler
+    virtual void removeDevice(long handler) = 0;           // unregister device by handler
     virtual dev_type_t getDeviceType() = 0;
 
     virtual ~DriverBase() = default;
 };
 
-// void k_add_driver(DriverBase *drv);
+class DriverChar : public DriverBase
+{
+  public:
+    virtual int open(long handler) = 0;
+    virtual int close(long handler) = 0;
+    virtual int read(long handler, void *buf, int len) = 0;
+    virtual int write(long handler, const void *buf, int len) = 0;
+    virtual int ioctl(long handler, int cmd, void *arg) = 0;
+};
+
+class DriverBlock : public DriverBase
+{
+  public:
+    virtual int read(long handler, void *buf, int len, int offset) = 0;
+    virtual int write(long handler, const void *buf, int len, int offset) = 0;
+    virtual int ioctl(long handler, int cmd, void *arg) = 0;
+};
 
 class DriverManager
 {
@@ -38,25 +62,41 @@ class DriverManager
     {
         _drvlist.push_back(&drv);
     }
-    static void removeDriver(DriverBase &drv)
+
+    static int alsoInstalled(const void *fdt, int node, long handler, DriverBase *drv, int drv_cap)
     {
-        for (auto it = _drvlist.begin(); it != _drvlist.end(); ++it)
-        {
-            if (*it == &drv)
-            {
-                _drvlist.erase(it);
-                break;
-            }
-        }
+        auto rc = fdt_get_name(fdt, node, NULL);
+        if (!rc)
+            return -1;
+        _devhdl.insert(std::make_pair(node, std::make_tuple(drv, drv_cap, handler)));
+        extern int printf(const char *fmt, ...);
+        printf("(#%i [%s] => %ld) ", node, rc, handler);
+        return 0;
     }
 
+    // static void removeDriver(DriverBase &drv)
+    // {
+    //     for (auto it = _drvlist.begin(); it != _drvlist.end(); ++it)
+    //     {
+    //         if (*it == &drv)
+    //         {
+    //             _drvlist.erase(it);
+    //             break;
+    //         }
+    //     }
+    // }
+
   protected:
-    static int probe(const void *fdt,int node = 0);
+    // static long find
+    static int probe(const void *fdt, dev_type_t type = DEV_TYPE_PERIP, int node = 0);
+    static long getDrvByPath(const void *fdt, const char *path, void **drv);
+
     friend int k_main(int argc, const char *argv[]);
 
   private:
     static std::vector<DriverBase *> _drvlist;
-    static int _try(const void *fdt, int node);
+    static std::map<int, std::tuple<DriverBase *, int, long>> _devhdl; // node, <drv,rc,hdl>
+    static int _try(const void *fdt, int node, dev_type_t type);
 };
 
 #else
