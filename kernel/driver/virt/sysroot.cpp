@@ -43,7 +43,7 @@ class VirtRoot : public SysRoot
                 auto prop = fdt_get_property(fdt, rc, "stdout-path", &len);
                 if (prop)
                     _stdout_path = std::string(prop->data);
-                DriverManager::alsoInstalled(fdt, rc, 0, this, DRV_CAP_THIS); // mark as installed
+                DriverManager::markInstalled(fdt, rc, 0, this, DRV_CAP_THIS); // mark as installed
             }
 
             return 0; // singleton device
@@ -53,10 +53,6 @@ class VirtRoot : public SysRoot
     }
     void removeDevice(long handler) override
     {
-    }
-    dev_type_t getDeviceType() override
-    {
-        return DEV_TYPE_SYS;
     }
 };
 

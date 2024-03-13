@@ -182,11 +182,6 @@ class Drv_Uart8250 : public DriverChar
     {
     }
 
-    dev_type_t getDeviceType() override
-    {
-        return DEV_TYPE_CHAR;
-    }
-
     int open(long handler) override
     {
 

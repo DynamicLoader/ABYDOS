@@ -40,6 +40,32 @@ int k_main(int argc, const char *argv[])
         std::cout << "====================" << std::endl;
     }
 
+    SysMem *sysmem;
+    auto smhdl = DriverManager::getDrvByPath(
+        k_fdt, "/memory",
+        (void **)&sysmem); // must found at least one memory node, otherwise the kernel does not run here!
+    if (smhdl < 0) // We also judge here to see if the driver is configured properly...
+    {
+        std::cout << "[E] SysMem not installed properly... Kernel Panic!" << std::endl;
+        return K_ENOSPC;
+    }
+    else
+    {
+        // Add reserved memory from DRAM_START to KERNEL_OFFSET
+        extern char _DRAM_BASE, _KERNEL_OFFSET;
+        sysmem->addReservedMem((size_t)&_DRAM_BASE, (size_t)&_KERNEL_OFFSET);
+        std::cout << "Reserved memory: ";
+        for (auto &mem : sysmem->reservedMem())
+            std::cout << "(0x" << std::hex << mem.first << " - 0x" << mem.first + mem.second << ") ";
+        std::cout << std::endl;
+
+        std::cout << "Available memory: ";
+        for (auto &mem : sysmem->availableMem())
+            std::cout << "(0x" << std::hex << mem.first << " - 0x" << mem.first + mem.second << ") ";
+        std::cout << std::endl;
+        std::cout << "====================" << std::endl;
+    }
+
     // Probing peripheral devices
     std::cout << "> Probing peripheral devices" << std::endl;
     DriverManager::probe(k_fdt, DEV_TYPE_PERIP);

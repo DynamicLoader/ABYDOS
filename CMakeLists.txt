@@ -62,7 +62,7 @@ target_link_options(AbydOS_KNL
     
     PUBLIC  -Wl,--no-relax
     # PUBLIC -Wl,--build-id=none
-    # PUBLIC -Wl,--fpie
+    # PUBLIC -Wl,-pie -fpie
     # PUBLIC -Wl,--no-dynamic-linker 
     # PUBLIC -fno-pie -no-pie # overrides C_FLA
 

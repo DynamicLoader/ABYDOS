@@ -23,7 +23,6 @@ const char *kernel_args_array[256] = {0};
 int kernel_cmdargc = 0;
 
 uint8_t k_fdt[K_FDT_MAX_SIZE] = {0};
-uint64_t k_mem_size = 0;
 
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
                         unsigned long arg3, unsigned long arg4, unsigned long arg5)
@@ -367,7 +366,7 @@ long k_early_boot(const unsigned long hart_id, const void *dtb_addr, void **sys_
     memcpy(k_fdt, dtb_addr, fdtsize);
 
     // set the system stack base
-    k_mem_size = (mem_len_cmdarg > 0) ? mem_len_cmdarg : mem_len;
+    uint64_t k_mem_size = (mem_len_cmdarg > 0) ? mem_len_cmdarg : mem_len;
 
     *sys_stack_base = (void *)(mem_start + k_mem_size);
     printf("[EBOOT] Set SYS_SP: 0x%lx\n", (unsigned long)*sys_stack_base);

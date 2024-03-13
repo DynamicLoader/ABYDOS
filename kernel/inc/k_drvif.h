@@ -45,6 +45,11 @@ class DriverChar : public DriverBase
     virtual int read(long handler, void *buf, int len) = 0;
     virtual int write(long handler, const void *buf, int len) = 0;
     virtual int ioctl(long handler, int cmd, void *arg) = 0;
+
+    virtual dev_type_t getDeviceType() override
+    {
+        return DEV_TYPE_CHAR;
+    }
 };
 
 class DriverBlock : public DriverBase
@@ -53,6 +58,11 @@ class DriverBlock : public DriverBase
     virtual int read(long handler, void *buf, int len, int offset) = 0;
     virtual int write(long handler, const void *buf, int len, int offset) = 0;
     virtual int ioctl(long handler, int cmd, void *arg) = 0;
+
+    virtual dev_type_t getDeviceType() override
+    {
+        return DEV_TYPE_BLOCK;
+    }
 };
 
 class DriverManager
@@ -63,7 +73,7 @@ class DriverManager
         _drvlist.push_back(&drv);
     }
 
-    static int alsoInstalled(const void *fdt, int node, long handler, DriverBase *drv, int drv_cap)
+    static int markInstalled(const void *fdt, int node, long handler, DriverBase *drv, int drv_cap)
     {
         auto rc = fdt_get_name(fdt, node, NULL);
         if (!rc)
@@ -74,17 +84,28 @@ class DriverManager
         return 0;
     }
 
-    // static void removeDriver(DriverBase &drv)
-    // {
-    //     for (auto it = _drvlist.begin(); it != _drvlist.end(); ++it)
-    //     {
-    //         if (*it == &drv)
-    //         {
-    //             _drvlist.erase(it);
-    //             break;
-    //         }
-    //     }
-    // }
+    // The function would not delete the device, so the handler is still valid
+    static void removeDriver(DriverBase &drv)
+    {
+        for (auto it = _drvlist.begin(); it != _drvlist.end(); ++it)
+        {
+            if (*it == &drv)
+            {
+                _drvlist.erase(it);
+                break;
+            }
+        }
+    }
+
+    static DriverBase *getDriverByProbe(const char *name, const char *compatible)
+    {
+        for (auto &drv : _drvlist)
+        {
+            if (drv->probe(name, compatible) > 0)
+                return drv;
+        }
+        return nullptr;
+    }
 
   protected:
     // static long find

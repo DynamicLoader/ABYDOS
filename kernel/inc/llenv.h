@@ -21,6 +21,6 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0,
                         unsigned long arg5);
 
 extern uint8_t k_fdt[K_FDT_MAX_SIZE];
-extern uint64_t k_mem_size;
+// extern uint64_t k_mem_size;
 
 #endif

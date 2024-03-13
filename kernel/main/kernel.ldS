@@ -12,7 +12,7 @@ ENTRY(_start)
 
 _DRAM_BASE = 0x80000000;
 _KERNEL_OFFSET = 0x200000;
-_DRAM_SIZE = 64 * 1024 * 1024;
+/* _DRAM_SIZE = 64 * 1024 * 1024; */
 
 /* Temporary stack size, this will get overlapped with heap. Only used in early boot funcs */
 _KERNEL_BOOT_STACK_SIZE = 65536; 
