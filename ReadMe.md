@@ -45,11 +45,19 @@ In VSCODE, it can be done by editing the `settings.json` and add the segment bel
 
 ## Testing
 
-It's not necessary to build OpenSBI for a full installation of QEMU (-bios=default). if you don't, please compile it with `PLATFORM=generic` then run the QEMU using the command in under `opensbi` directory:
+It's not necessary to build OpenSBI for a full installation of QEMU (-bios=default). if you don't, please compile it with `PLATFORM=generic` then run the QEMU using the command in `opensbi` directory:
 
 ```bash
 qemu-system-riscv64 -M virt -m 256M -nographic -bios build/platform/generic/firmware/fw_jump.elf -kernel ../build/AbydOS_KNL
 ```
+
+If you'd like to connect a FLASH, just generate a flash file with exact size of 32MB, then add the arguement below:
+
+```
+-drive if=pflash,file=/path/to/pflash,unit=1
+```
+
+Note that `unit=1` is required since QEMU takes the first pflash as a boot device.
 
 To debug it, start the QEMU with gdb-stub like:
 

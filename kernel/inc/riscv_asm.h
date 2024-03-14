@@ -2,9 +2,9 @@
 #define __RISCV_ASM_H__
 
 #ifdef __ASSEMBLER__
-#define __ASM_STR(x)	x
+#define __ASM_STR(x) x
 #else
-#define __ASM_STR(x)	#x
+#define __ASM_STR(x) #x
 #endif
 
 #define csr_swap(csr, val)                                                                                             \
@@ -16,7 +16,7 @@
 
 #define csr_read(csr)                                                                                                  \
     ({                                                                                                                 \
-        unsigned long __v;                                                                                    \
+        unsigned long __v;                                                                                             \
         __asm__ __volatile__("csrr %0, " __ASM_STR(csr) : "=r"(__v) : : "memory");                                     \
         __v;                                                                                                           \
     })
@@ -53,14 +53,22 @@
         __asm__ __volatile__("csrc " __ASM_STR(csr) ", %0" : : "rK"(__v) : "memory");                                  \
     })
 
-#define wfi()                                             \
-	do {                                              \
-		__asm__ __volatile__("wfi" ::: "memory"); \
-	} while (0)
+#define wfi()                                                                                                          \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        __asm__ __volatile__("wfi" ::: "memory");                                                                      \
+    } while (0)
 
-#define ebreak()                                             \
-	do {                                              \
-		__asm__ __volatile__("ebreak" ::: "memory"); \
-	} while (0)
+#define ebreak()                                                                                                       \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        __asm__ __volatile__("ebreak" ::: "memory");                                                                   \
+    } while (0)
+
+#define sfence_vma()                                                                                                   \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        __asm__ __volatile__("sfence.vma x0,x0" ::: "memory");                                                         \
+    } while (0)
 
 #endif

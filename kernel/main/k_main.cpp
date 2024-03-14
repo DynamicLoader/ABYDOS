@@ -7,6 +7,7 @@
 #include "k_sbif.hpp"
 #include "k_drvif.h"
 #include "k_sysdev.h"
+#include "k_mmu.h"
 
 SBIF::DebugCon dbg;
 
@@ -65,6 +66,9 @@ int k_main(int argc, const char *argv[])
         std::cout << std::endl;
         std::cout << "====================" << std::endl;
     }
+
+    SV39MMU mmu(0);
+
 
     // Probing peripheral devices
     std::cout << "> Probing peripheral devices" << std::endl;
