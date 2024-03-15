@@ -24,6 +24,8 @@ extern "C"
     int fdt_get_node_addr_size_by_name(const void *fdt, int node, const char *name, uint64_t *addr, uint64_t *size);
     bool fdt_node_is_enabled(const void *fdt, int nodeoff);
 
+    void fdt_print_node(const void *fdt, int node, int depth);
+
 #ifdef __cplusplus
 }
 #endif

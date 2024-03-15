@@ -44,6 +44,11 @@ class GenericRoot : public SysRoot
                 auto prop = fdt_get_property(fdt, rc, "stdout-path", &len);
                 if (prop)
                     _stdout_path = std::string(prop->data);
+                
+                prop = fdt_get_property(fdt, rc, "bootargs", &len);
+                if(prop)
+                    _bootargs = std::string(prop->data);
+
                 DriverManager::markInstalled(fdt, rc, 0, this,DRV_CAP_THIS); // mark as installed
 
                 return 0; // singleton device

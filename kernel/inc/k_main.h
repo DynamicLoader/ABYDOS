@@ -6,7 +6,8 @@
 extern "C" {
 #endif
 
-int k_main(int argc,const char** argv);
+int k_premain_0(void**);
+int k_main(int hartid);
 
 #ifdef __cplusplus
 }

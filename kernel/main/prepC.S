@@ -48,23 +48,6 @@ _bss_zero:
 	add	a4, a4, __SIZEOF_POINTER__
 	blt	a4, a5, _bss_zero
 
-	/* Setup boot C stack */
-	lla	a3, _kernel_end
-	lla	a4, _KERNEL_BOOT_STACK_SIZE /* this is fake a address provided from ld */
-	add	sp, a3, a4
-	lla a3, _sys_stack_base
-	REG_S	sp, 0(a3)
-
-	/* Early boot in C */
-	lla	a3, _boot_a0
-	REG_L	a0, 0(a3)
-	lla	a3, _boot_a1
-	REG_L	a1, 0(a3)
-	lla a2, _sys_stack_base
-	call k_early_boot
-
-	bne a0, zero, _start_hang 
-
 	/* relocate  */
 # 	lla	t0, _link_start
 # 	REG_L	t0, 0(t0)
@@ -89,25 +72,51 @@ _bss_zero:
 # 	# j	_relocate_done
 # _relocate_done:
 
+_prep_boot:
+	/* Disable and clear all interrupts */
+	csrw	CSR_SIE, zero
+	csrw	CSR_SIP, zero
+
+	/* Setup boot stack */
+	lla	a3, _kernel_end
+	lla	a4, _KERNEL_BOOT_STACK_SIZE /* this is fake a address provided from ld */
+	add	sp, a3, a4
+	lla a3, _sys_stack_base
+	REG_S	sp, 0(a3)
+
+	/* Early boot in C */
+	lla	a3, _boot_a1
+	REG_L	a0, 0(a3)
+	call k_early_boot
+
+	bne a0, zero, _kernel_hang 
+
+	/* Boot stage 1: Start Kernel premain */
+	lla a0, _sys_stack_base
+	call k_premain_0
+	bne a0, zero, _kernel_hang
+
 _start_warm:
 	/* Disable and clear all interrupts */
 	csrw	CSR_SIE, zero
 	csrw	CSR_SIP, zero
 
 	/* Setup exception vectors */
-	lla	a3, _start_hang
+	lla	a3, _kernel_hang
 	csrw	CSR_STVEC, a3
 
 	/* Setup system stack base */
 	lla a3, _sys_stack_base
 	REG_L sp, 0(a3)
 
-	/* Jump to C main */
+	/* Boot stage 2: Start Main */
 	lla	a3, _boot_a0
 	REG_L	a0, 0(a3)
-	# lla	a3, _boot_a1
-	# REG_L	a1, 0(a3)
-	call	k_cstart /* start kernel */
+	call	k_main
+
+	/* And the last thing: after main */
+_kernel_hang:
+	call k_after_main
 
 	/* We don't expect to reach here hence just hang */
 	j	_start_hang
@@ -117,9 +126,6 @@ _start_warm:
 	.globl _start_hang
 _start_hang:
 	wfi
-	div t2, t2,zero
-	div t2, t2,zero
-	div t2, t2,zero
 	j	_start_hang
 
 	.section .data

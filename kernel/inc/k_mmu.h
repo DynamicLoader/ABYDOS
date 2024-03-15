@@ -9,10 +9,30 @@
 class MMUBase
 {
   public:
+    virtual bool enable(bool enable) = 0;
 };
 
 class RV64MMUBase : public MMUBase
 {
+
+  public:
+    bool enable(bool enable)
+    {
+        if (enable)
+        {
+            csr_write(CSR_SATP, *(uint64_t *)(&_satp));
+            if (csr_read(CSR_SATP) != *(uint64_t *)(&_satp))
+                return false;
+            sfence_vma();
+            return true;
+        }
+        else
+        {
+            csr_write(CSR_SATP, 0);
+            sfence_vma();
+            return true;
+        }
+    }
 
   protected:
     enum MMUMode_t
@@ -76,20 +96,6 @@ class RV64MMUBase : public MMUBase
         return true;
     }
 
-    void setState(bool enable)
-    {
-        if (enable)
-        {
-            csr_write(CSR_SATP, *(uint64_t *)(&_satp));
-            sfence_vma();
-        }
-        else
-        {
-            csr_write(CSR_SATP, 0);
-            sfence_vma();
-        }
-    }
-
     /**
      * @brief switch the ASID to this
      */
@@ -114,6 +120,8 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             return MMUMode_t::SV48;
         else if constexpr (sz == 57)
             return MMUMode_t::SV57;
+        else if constexpr (sz == 64)
+            return MMUMode_t::SV64;
         else
             return MMUMode_t::BARE;
     }
@@ -132,23 +140,11 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             _ptes[i].x = 1;
             _ptes[i].ppn0 = 0;
             _ptes[i].ppn1 = 0; // 30bits here
-            // We map the 4G from 3G space...
-            _ptes[i].ppn2 = (i == 3 ? 2 : i);
+            _ptes[i].ppn2 = i;
             _ptes[i].template fit<sz>();
         }
 
-        printf("Going to enable MMU...");
-        fflush(stdout);
-        setState(true);
-        printf("OK!\n");
-
-        int a = 114514;
-        printf("Original addr of a: 0x%lx with value %i\n", (uintptr_t)&a, a);
-        int *pa = (&a) + 0x40000000 / sizeof(int);
-        printf("Mapped addr of a: 0x%lx with value %i\n", (uintptr_t)pa, *pa);
-
-        *pa = 1919810;
-        printf("We modified from mapped, now the original value is %i\n", a);
+        _ptes[255] = _ptes[2]; // stack
     }
 
   private:

@@ -1,5 +1,5 @@
 
-
+#include <stdio.h>
 #include "fdt_helper.h"
 
 
@@ -187,3 +187,102 @@ bool fdt_node_is_enabled(const void *fdt, int nodeoff)
 
 	return false;
 }
+
+#ifdef DEBUG
+
+static char depth_set[32];
+
+
+static void pretty_node(int depth)
+{
+    if (depth == 0)
+        return;
+
+    for (int i = 0; i < depth - 1; ++i)
+        printf(depth_set[i] ? "|   " : "    ");
+
+    printf(depth_set[depth - 1] ? "+-- " : "\\-- ");
+}
+
+static void pretty_prop(int depth)
+{
+    for (int i = 0; i < depth; ++i)
+        printf(depth_set[i] ? "|   " : "    ");
+
+    printf(depth_set[depth] ? "|  " : "   ");
+}
+
+static void print_node_prop(const void *fdt, int node, int depth)
+{
+    int prop;
+    fdt_for_each_property_offset(prop, fdt, node)
+    {
+        if (depth >= 0)
+            pretty_prop(depth);
+        int size;
+        const char *name;
+        const char *value = fdt_getprop_by_offset(fdt, prop, &name, &size);
+
+        bool is_str = !(size > 1 && value[0] == 0);
+        if (is_str)
+        {
+            // Scan through value to see if printable
+            for (int i = 0; i < size; ++i)
+            {
+                char c = value[i];
+                if (i == size - 1)
+                {
+                    // Make sure null terminate
+                    is_str = c == '\0';
+                }
+                else if ((c > 0 && c < 32) || c >= 127)
+                {
+                    is_str = false;
+                    break;
+                }
+            }
+        }
+
+        if (is_str)
+        {
+            printf("[%s]: [%s]\n", name, value);
+        }
+        else
+        {
+            // printf("[%s]: <bytes>(%d)\n", name, size);
+            printf("[%s]: <bytes>(%d) ", name, size);
+            for (int i = 0; i < size; i++)
+                printf("0x%02X ", value[i]);
+            printf("\n");
+        }
+    }
+}
+
+void fdt_print_node(const void *fdt, int node, int depth)
+{
+    // Print node itself
+    pretty_node(depth);
+    printf("#%d: %s\n", node, fdt_get_name(fdt, node, NULL));
+
+    // Print properties
+    depth_set[depth] = fdt_first_subnode(fdt, node) >= 0;
+    print_node_prop(fdt, node, depth);
+
+    // Recursive
+    if (depth_set[depth])
+    {
+        int child;
+        int prev = -1;
+        fdt_for_each_subnode(child, fdt, node)
+        {
+            if (prev >= 0)
+                fdt_print_node(fdt, prev, depth + 1);
+            prev = child;
+        }
+        depth_set[depth] = false;
+        fdt_print_node(fdt, prev, depth + 1);
+    }
+}
+
+
+#endif

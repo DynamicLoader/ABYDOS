@@ -43,16 +43,16 @@ typedef uint32_t		be32_t;
 typedef uint64_t		le64_t;
 typedef uint64_t		be64_t;
 
-#ifndef __cplusplus
+// #ifndef __cplusplus
 
-#define __packed		__attribute__((packed))
-#define __noreturn		__attribute__((noreturn))
-#define __aligned(x)		__attribute__((aligned(x)))
-#define __always_inline	inline __attribute__((always_inline))
+// #define __packed		__attribute__((packed))
+// #define __noreturn		__attribute__((noreturn))
+// #define __aligned(x)		__attribute__((aligned(x)))
+// #define __always_inline	inline __attribute__((always_inline))
 
-#define likely(x) __builtin_expect((x), 1)
-#define unlikely(x) __builtin_expect((x), 0)
+// #define likely(x) __builtin_expect((x), 1)
+// #define unlikely(x) __builtin_expect((x), 0)
 
-#endif
+// #endif
 
 #endif

@@ -22,11 +22,13 @@ class SysRoot : public DriverBase
     __K_PROP_EXPORT__(compatible, _compatible)
     __K_PROP_EXPORT__(model, _model)
     __K_PROP_EXPORT__(stdout_path, _stdout_path)
+    __K_PROP_EXPORT__(bootargs, _bootargs)
 
   protected:
     std::string _compatible;
     std::string _model;
     std::string _stdout_path;
+    std::string _bootargs;
 };
 
 // If custom SysMem class is provided in platform, SysRoot should be implemented as well,

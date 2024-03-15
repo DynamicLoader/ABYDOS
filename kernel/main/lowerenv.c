@@ -13,16 +13,13 @@
 
 #include <stdio.h>
 
-#include "k_main.h"
-#include "llenv.h"
 
+#include "k_defs.h"
+#include "llenv.h"
 #include "libfdt.h"
 
-char kernel_args[4096] = "--test -tty serial";
-const char *kernel_args_array[256] = {0};
-int kernel_cmdargc = 0;
 
-uint8_t k_fdt[K_FDT_MAX_SIZE] = {0};
+void* k_fdt = NULL;
 
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
                         unsigned long arg3, unsigned long arg4, unsigned long arg5)
@@ -45,7 +42,7 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1
 }
 
 extern int _write(int fd, char *buf, int size);
-extern bool k_stdout_switched;
+extern _Bool k_stdout_switched;
 
 void *_sbrk(ptrdiff_t incr)
 {
@@ -73,34 +70,42 @@ void *_sbrk(ptrdiff_t incr)
     return (void *)prev_heap_end;
 }
 
-static int split_args(char *in, const char **out) // Out of buffer to be fixed
-{
-    int in_quotes = 0;
-    int count = 0;
-    out[count] = in;
+// static int split_args(char *in, const char **out) // Out of buffer to be fixed
+// {
+//     int in_quotes = 0;
+//     int count = 0;
+//     out[count] = in;
 
-    for (; *in; ++in)
-    {
-        if (*in == '\"')
-        {
-            in_quotes = !in_quotes;
-            continue;
-        }
-        if (*in == ' ' && !in_quotes)
-        {
-            *in = '\0';
-            out[++(count)] = in + 1;
-        }
-    }
-    (count)++; // always return +1
-    return count;
-}
+//     for (; *in; ++in)
+//     {
+//         if (*in == '\"')
+//         {
+//             in_quotes = !in_quotes;
+//             continue;
+//         }
+//         if (*in == ' ' && !in_quotes)
+//         {
+//             *in = '\0';
+//             out[++(count)] = in + 1;
+//         }
+//     }
+//     (count)++; // always return +1
+//     return count;
+// }
 
 // kernel init
-void k_before_main(unsigned long pa0)
+int k_early_boot(const void* fdt)
 {
     printf("\n===== Entered Test Kernel =====\n");
-    printf("a0: 0x%lx\n", pa0);
+
+    // Copy fdt to heap
+    k_fdt = malloc(fdt_totalsize(fdt));
+    if(!k_fdt)
+    {
+        printf("Failed to allocate memory for FDT\n");
+        return K_ENOMEM;
+    }
+    memcpy(k_fdt, fdt, fdt_totalsize(fdt));
 
     // init C++ exceptions
     extern void *__eh_frame_start;
@@ -113,6 +118,8 @@ void k_before_main(unsigned long pa0)
     extern __init_func_ptr _init_array_start[0], _init_array_end[0];
     for (__init_func_ptr *func = _init_array_start; func != _init_array_end; func++)
         (*func)();
+
+    return 0;
 }
 
 // kernel exit
@@ -130,246 +137,4 @@ void k_after_main(int main_ret)
         (*func)();
 
     printf("===== Test Kernel exited with %i =====\n", main_ret);
-}
-
-void k_cstart(unsigned long a0) // To be called from prepC.S
-{
-    k_before_main(a0);
-
-    int ret = k_main(kernel_cmdargc, kernel_args_array);
-
-    k_after_main(ret);
-    // After exit from here, infini loop in asm...
-}
-
-#ifdef DEBUG
-
-static char depth_set[32];
-
-static void pretty_node(int depth)
-{
-    if (depth == 0)
-        return;
-
-    for (int i = 0; i < depth - 1; ++i)
-        printf(depth_set[i] ? "|   " : "    ");
-
-    printf(depth_set[depth - 1] ? "+-- " : "\\-- ");
-}
-
-static void pretty_prop(int depth)
-{
-    for (int i = 0; i < depth; ++i)
-        printf(depth_set[i] ? "|   " : "    ");
-
-    printf(depth_set[depth] ? "|  " : "   ");
-}
-
-static void print_node_prop(const void *fdt, int node, int depth)
-{
-    int prop;
-    fdt_for_each_property_offset(prop, fdt, node)
-    {
-        if (depth >= 0)
-            pretty_prop(depth);
-        int size;
-        const char *name;
-        const char *value = fdt_getprop_by_offset(fdt, prop, &name, &size);
-
-        bool is_str = !(size > 1 && value[0] == 0);
-        if (is_str)
-        {
-            // Scan through value to see if printable
-            for (int i = 0; i < size; ++i)
-            {
-                char c = value[i];
-                if (i == size - 1)
-                {
-                    // Make sure null terminate
-                    is_str = c == '\0';
-                }
-                else if ((c > 0 && c < 32) || c >= 127)
-                {
-                    is_str = false;
-                    break;
-                }
-            }
-        }
-
-        if (is_str)
-        {
-            printf("[%s]: [%s]\n", name, value);
-        }
-        else
-        {
-            // printf("[%s]: <bytes>(%d)\n", name, size);
-            printf("[%s]: <bytes>(%d) ", name, size);
-            for (int i = 0; i < size; i++)
-                printf("0x%02X ", value[i]);
-            printf("\n");
-        }
-    }
-}
-
-static void print_node(const void *fdt, int node, int depth)
-{
-    // Print node itself
-    pretty_node(depth);
-    printf("#%d: %s\n", node, fdt_get_name(fdt, node, NULL));
-
-    // Print properties
-    depth_set[depth] = fdt_first_subnode(fdt, node) >= 0;
-    print_node_prop(fdt, node, depth);
-
-    // Recursive
-    if (depth_set[depth])
-    {
-        int child;
-        int prev = -1;
-        fdt_for_each_subnode(child, fdt, node)
-        {
-            if (prev >= 0)
-                print_node(fdt, prev, depth + 1);
-            prev = child;
-        }
-        depth_set[depth] = false;
-        print_node(fdt, prev, depth + 1);
-    }
-}
-
-#endif
-
-// To be called from prepC.S of early boot age, only once when cold boot
-// Note that here we have limited stack and heap (Totally 64KB by default), be careful!
-long k_early_boot(const unsigned long hart_id, const void *dtb_addr, void **sys_stack_base)
-{
-
-    int ret = fdt_check_header(dtb_addr);
-    if (ret != 0)
-    {
-        puts("[EBOOT] FDT header check failed\n");
-        return -1;
-    }
-
-    ret = fdt_path_offset(dtb_addr, "/");
-    if (ret < 0)
-    {
-        puts("[EBOOT] FDT root node not found\n");
-        return -2;
-    }
-#ifdef DEBUG
-    print_node(dtb_addr, 0, 0);
-#endif
-
-    // Detect system memory size
-    ret = fdt_path_offset(dtb_addr, "/memory");
-    if (ret < 0)
-    {
-        puts("[EBOOT] FDT memory node not found\n");
-        return -3;
-    }
-
-    int regsize = 0;
-    const void *memreg = fdt_getprop(dtb_addr, ret, "reg", &regsize);
-    if (!memreg || regsize < 16)
-    {
-        puts("[EBOOT] FDT memory reg invalid\n");
-        return -4;
-    }
-
-    unsigned long mem_start = fdt64_to_cpu(((const unsigned long *)memreg)[0]);
-    unsigned long mem_len = fdt64_to_cpu(((const unsigned long *)memreg)[1]);
-
-    printf("[EBOOT] Memory Range: base= 0x%lx, len= 0x%lx\n", mem_start, mem_len);
-
-    // Get the kernel command line
-    ret = fdt_path_offset(dtb_addr, "/chosen");
-    if (ret < 0)
-    {
-        puts("[EBOOT] FDT chosen node not found\n");
-        return -5;
-    }
-    const void *kcmdline = fdt_getprop(dtb_addr, ret, "bootargs", &regsize);
-    if (!kcmdline || regsize < 1)
-    {
-        puts("[EBOOT] FDT bootargs invalid\n");
-        return -6;
-    }
-    memcpy(kernel_args, kcmdline, regsize);
-    puts("[EBOOT] Kernel command line: ");
-    puts(kernel_args);
-
-    // Parse Kerenl command line args for memory size (force override if specified in cmdline, only the first one is
-    // used!)
-    kernel_cmdargc = split_args((char *)kernel_args, kernel_args_array);
-    unsigned long mem_len_cmdarg = 0;
-    char mem_suffix = 'M';
-    for (int i = 0; i < kernel_cmdargc; ++i)
-    {
-        if (strncmp(kernel_args_array[i], "-mem", 4) == 0)
-        {
-            if (i < kernel_cmdargc - 1)
-            {
-                int res = sscanf(kernel_args_array[i + 1], "%ld %c", &mem_len_cmdarg, &mem_suffix);
-                if (res == 0)
-                {
-                    puts("[EBOOT] Invalid memory size specified, skipping\n");
-                    mem_len_cmdarg = 0;
-                    break;
-                }
-                if (res == 1)
-                {
-                    puts("[EBOOT] Memory size specified without suffix, assuming MB\n");
-                    mem_len_cmdarg *= 1024 * 1024;
-                    break;
-                }
-                if (res == 2)
-                {
-                    switch (mem_suffix)
-                    {
-                    case 'K':
-                    case 'k':
-                        mem_len_cmdarg *= 1024;
-                        break;
-                    case 'M':
-                    case 'm':
-                        mem_len_cmdarg *= 1024 * 1024;
-                        break;
-                    case 'G':
-                    case 'g':
-                        mem_len_cmdarg *= 1024 * 1024 * 1024;
-                        break;
-                    default:
-                        puts("[EBOOT] Invalid memory size suffix, skipping\n");
-                        mem_len_cmdarg = 0;
-                        break;
-                    }
-                    break;
-                }
-            }
-            else
-            {
-                puts("[EBOOT] Memory size not specified, skipping\n");
-                mem_len_cmdarg = 0;
-                break;
-            }
-        }
-    }
-
-    // Copy device tree to specified address
-    int fdtsize = fdt_totalsize(dtb_addr);
-    if (fdtsize > K_FDT_MAX_SIZE)
-    {
-        puts("[EBOOT] FDT too large\n");
-        return -7;
-    }
-    memcpy(k_fdt, dtb_addr, fdtsize);
-
-    // set the system stack base
-    uint64_t k_mem_size = (mem_len_cmdarg > 0) ? mem_len_cmdarg : mem_len;
-
-    *sys_stack_base = (void *)(mem_start + k_mem_size);
-    printf("[EBOOT] Set SYS_SP: 0x%lx\n", (unsigned long)*sys_stack_base);
-
-    return 0; // Non-zero to indicate error and hang the system
 }

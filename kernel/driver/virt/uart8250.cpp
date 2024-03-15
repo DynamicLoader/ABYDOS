@@ -91,10 +91,10 @@ class Drv_Uart8250 : public DriverChar
   public:
     int probe(const char *name, const char *compatible) override
     {
-        std::string id = name;
-        if (id.find("uart") == std::string::npos)
-            return DRV_CAP_NONE;
-        id = compatible;
+        // std::string id = name;
+        // if (id.find("uart") == std::string::npos)
+        //     return DRV_CAP_NONE;
+        std::string id = compatible;
         return (id == "ns16550" || id == "ns16550a" || id == "snps,dw-apb-uart") ? DRV_CAP_THIS : DRV_CAP_NONE;
     }
 

@@ -14,18 +14,20 @@ SBIF::DebugCon dbg;
 std::function<int(const char *, int size)> k_stdout_func;
 bool k_stdout_switched = false;
 
-int k_main(int argc, const char *argv[])
-{
-    std::cout << "cmd args: ";
-    for (int i = 0; i < argc; ++i)
-        std::cout << "'" << argv[i] << "' ";
-    std::cout << std::endl;
+SysRoot *sysroot = nullptr;
+SysMem *sysmem = nullptr;
+MMUBase *sysmmu = nullptr;
 
-    // Probing system devices
+int k_premain_0(void **sys_stack_base)
+{
+#ifdef DEBUG
+    std::cout << "Dumping Device tree..." << std::endl;
+    fdt_print_node(k_fdt, 0, 0);
+#endif
+
     std::cout << "> Probing system devices" << std::endl;
     DriverManager::probe(k_fdt, DEV_TYPE_SYS);
 
-    SysRoot *sysroot;
     auto srhdl = DriverManager::getDrvByPath(k_fdt, "/", (void **)&sysroot);
     if (srhdl < 0)
     {
@@ -38,14 +40,14 @@ int k_main(int argc, const char *argv[])
         std::cout << "Model: " << sysroot->model() << std::endl;
         std::cout << "Compatible: " << sysroot->compatible() << std::endl;
         std::cout << "Stdout: " << sysroot->stdout_path() << std::endl;
+        std::cout << "Bootargs: " << sysroot->bootargs() << std::endl;
         std::cout << "====================" << std::endl;
     }
 
-    SysMem *sysmem;
     auto smhdl = DriverManager::getDrvByPath(
         k_fdt, "/memory",
         (void **)&sysmem); // must found at least one memory node, otherwise the kernel does not run here!
-    if (smhdl < 0) // We also judge here to see if the driver is configured properly...
+    if (smhdl < 0)         // We also judge here to see if the driver is configured properly...
     {
         std::cout << "[E] SysMem not installed properly... Kernel Panic!" << std::endl;
         return K_ENOSPC;
@@ -66,10 +68,41 @@ int k_main(int argc, const char *argv[])
         std::cout << std::endl;
         std::cout << "====================" << std::endl;
     }
+    sysmmu = new SV39MMU(0);
 
-    SV39MMU mmu(0);
+    std::cout << "Enabling MMU..." << std::flush;
+    if (!sysmmu->enable(true))
+    {
+        std::cout << "Failed!" << std::endl;
+        return K_EFAIL;
+    }
+    std::cout << "OK!" << std::endl;
 
+    // int a = 0;
+    // printf("Original addr of a: 0x%lx with value %i\n", (uintptr_t)&a, a);
 
+    // int *pa = (int*)((((uintptr_t)(&a)) | 0xFFFFFFC000000000) + 0x80000000);
+
+    // for(int i = 0;i< 256;++i){
+    //     printf("Mapped addr of a: 0x%lx\n", (uintptr_t)pa);
+    //     printf("Mapped value of a: %i\n", *pa);
+    //     *pa += 1;
+    //     pa += 0x40000000 / sizeof(int);
+    // }
+
+    // printf("We modified from mapped, now the original value is %i\n", a);
+
+    // Setup stack (SV39)
+    *sys_stack_base = (void *)((uintptr_t)1 << 38);
+    // **(ulong**)(sys_stack_base - 8) = 0x123456789;
+
+    printf("Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
+
+    return 0;
+}
+
+int k_main(int hartid)
+{
     // Probing peripheral devices
     std::cout << "> Probing peripheral devices" << std::endl;
     DriverManager::probe(k_fdt, DEV_TYPE_PERIP);
