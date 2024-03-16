@@ -66,9 +66,30 @@ int k_premain_0(void **sys_stack_base)
         for (auto &mem : sysmem->availableMem())
             std::cout << "(0x" << std::hex << mem.first << " - 0x" << mem.first + mem.second << ") ";
         std::cout << std::endl;
-        std::cout << "====================" << std::endl;
+        std::cout << "====================" << std::endl << std::dec;
     }
+
+    // Setup MMU
+
+    auto rc = 0;
     sysmmu = new SV39MMU(0);
+    // Lower 4G: Direct mapping
+    rc = sysmmu->map(0, 0, 4 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
+    if (rc < 0)
+    {
+        std::cout << "[E] Failed to map lower 4G: " << rc << std::endl;
+        return K_EFAIL;
+    }
+
+    // Top of lower VMA: Kernel Stack
+    auto x = sysmem->availableMem().rbegin(); // assume that is sorted by start address
+    rc = sysmmu->map(sysmmu->getVMALowerTop() - x->second, x->first, x->second,
+                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
+    if (rc < 0)
+    {
+        std::cout << "[E] Failed to map kernel stack: " << rc << std::endl;
+        return K_EFAIL;
+    }
 
     std::cout << "Enabling MMU..." << std::flush;
     if (!sysmmu->enable(true))
@@ -92,12 +113,21 @@ int k_premain_0(void **sys_stack_base)
 
     // printf("We modified from mapped, now the original value is %i\n", a);
 
-    // Setup stack (SV39)
-    *sys_stack_base = (void *)((uintptr_t)1 << 38);
-    // **(ulong**)(sys_stack_base - 8) = 0x123456789;
+    auto a = alignedMalloc<long>(4096, 4096);
+    printf("Original addr of a: 0x%lx\n", (uintptr_t)a);
+    *a = 1145141919810;
+    printf("Original value of a: %li\n", *a);
+    sysmmu->map((uintptr_t)a | 0xFFFFFFC000000000, (uintptr_t)a, 4096, MMUBase::PROT_W | MMUBase::PROT_R);
+    sysmmu->apply();
 
-    printf("Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
+    printf("Mapped addr of a: 0x%lx\n", (uintptr_t)a | 0xFFFFFFC000000000);
+    printf("Mapped value of a: %li\n", *(long *)((uintptr_t)a | 0xFFFFFFC000000000));
+    *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
+    printf("We modified from mapped, now the original value is %li\n", *a);
 
+
+    *sys_stack_base = (void *)sysmmu->getVMALowerTop();
+    printf("> Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
     return 0;
 }
 

@@ -9,7 +9,30 @@
 class MMUBase
 {
   public:
+    static constexpr int PROT_NONE = 0, PROT_R = 1, PROT_W = 2, PROT_X = 4, PROT_U = 8, PROT_G = 16;
+
+    /**
+     * @brief Set MMU state
+     * @note The function will take effort immediately!
+     * @param enable true to enable, false to disable
+     * @return true if success, false if failed
+
+     */
     virtual bool enable(bool enable) = 0;
+
+    /**
+     * @brief switch the ASID to this
+     * @note The function will not sfence!
+     */
+    virtual void switchASID() = 0;
+
+    virtual int map(uintptr_t vaddr, uintptr_t paddr, size_t size, int prot) = 0;
+    virtual int unmap(uintptr_t vaddr, size_t size) = 0;
+
+    virtual void apply() = 0;
+
+    virtual size_t getVMALowerTop() = 0;
+    virtual size_t getVMAUpperBottom() = 0;
 };
 
 class RV64MMUBase : public MMUBase
@@ -34,7 +57,94 @@ class RV64MMUBase : public MMUBase
         }
     }
 
+    void switchASID()
+    {
+        csr_write(CSR_SATP, *(uint64_t *)(&_satp));
+        // No need to sfence.vma
+    }
+
   protected:
+    struct vaddr_t
+    {
+        uint64_t offset : 12;
+        uint64_t vpn0 : 9;
+        uint64_t vpn1 : 9;
+        uint64_t vpn2 : 9;
+        uint64_t vpn3 : 9;
+        uint64_t vpn4 : 9;
+
+        template <uint8_t sz> uint64_t getVPN(int level)
+        {
+            switch (level)
+            {
+            case 0:
+                if constexpr (sz == 39)
+                    return vpn2;
+                else if constexpr (sz == 48)
+                    return vpn3;
+                else if constexpr (sz == 57)
+                    return vpn4;
+                else
+                    return 0;
+                break;
+            case 1:
+                if constexpr (sz == 39)
+                    return vpn1;
+                else if constexpr (sz == 48)
+                    return vpn2;
+                else if constexpr (sz == 57)
+                    return vpn3;
+                else
+                    return 0;
+                break;
+            case 2:
+                if constexpr (sz == 39)
+                    return vpn0;
+                else if constexpr (sz == 48)
+                    return vpn1;
+                else if constexpr (sz == 57)
+                    return vpn2;
+                else
+                    return 0;
+                break;
+            case 3:
+                if constexpr (sz == 39)
+                    return 0;
+                else if constexpr (sz == 48)
+                    return vpn0;
+                else if constexpr (sz == 57)
+                    return vpn1;
+                else
+                    return 0;
+                break;
+            case 4:
+                if constexpr (sz == 39)
+                    return 0;
+                else if constexpr (sz == 48)
+                    return 0;
+                else if constexpr (sz == 57)
+                    return vpn0;
+                else
+                    return 0;
+                break;
+            default:
+                return 0;
+                break;
+            }
+        }
+    };
+
+    struct paddr_t
+    {
+        uint64_t offset : 12;
+        uint64_t ppn0 : 9;
+        uint64_t ppn1 : 9;
+        uint64_t ppn2 : 9;
+        uint64_t ppn3 : 9;
+        uint64_t ppn4 : 8;
+        uint64_t reserved : 8;
+    };
+
     enum MMUMode_t
     {
         BARE = 0,
@@ -73,6 +183,21 @@ class RV64MMUBase : public MMUBase
                 this->ppn4 = 0;
             return *this;
         }
+
+        void ppn(uintptr_t addr)
+        {
+            auto paddr = (paddr_t *)&addr;
+            ppn0 = paddr->ppn0;
+            ppn1 = paddr->ppn1;
+            ppn2 = paddr->ppn2;
+            ppn3 = paddr->ppn3;
+            ppn4 = paddr->ppn4;
+        }
+
+        uintptr_t paddr()
+        {
+            return (*((uintptr_t *)this) << 2) & ~((0xFFFUL) + (0xFFUL << 56));
+        }
     };
 
     struct satp_t
@@ -94,15 +219,6 @@ class RV64MMUBase : public MMUBase
             return false;
         _satp.ppn = addr2page4K(addr);
         return true;
-    }
-
-    /**
-     * @brief switch the ASID to this
-     */
-    void switchASID()
-    {
-        csr_write(CSR_SATP, *(uint64_t *)(&_satp));
-        // No need to sfence.vma
     }
 
   private: // data
@@ -131,20 +247,204 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     {
         _ptes = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
         setPPN((uintptr_t)_ptes);
-        // We allow lower 3G to be accessible for testing
-        for (int i = 0; i < 4; ++i)
+    }
+    ~RV64MMU()
+    {
+        alignedFree(_ptes);
+    }
+
+    size_t getVMALowerTop() override
+    {
+        if constexpr (sz == 39)
+            return (1ULL << 38);
+        else if constexpr (sz == 48)
+            return (1ULL << 47);
+        else if constexpr (sz == 57)
+            return (1ULL << 56);
+        else
+            return 0;
+    }
+
+    size_t getVMAUpperBottom() override
+    {
+        if constexpr (sz == 39)
+            return -1ULL - (1ULL << 38) + 1;
+        else if constexpr (sz == 48)
+            return -1ULL - (1ULL << 47) + 1;
+        else if constexpr (sz == 57)
+            return -1ULL - (1ULL << 56) + 1;
+        else
+            return 0;
+    }
+
+    int map(uintptr_t vaddr, uintptr_t paddr, size_t size, int prot) override
+    {
+        if (vaddr & 0xFFF || paddr & 0xFFF || size & 0xFFF) // Not aligned
+            return K_EINVAL;
+        if (size == 0)
+            return 0;                                     // No need to map with size == 0
+        if (vaddr + size < vaddr || paddr + size < paddr) // overflow
+            return K_EINVALID_ADDR;
+        // if (vaddr + size > (1ULL << sz) || paddr + size > (1ULL << sz))
+        //     return -1;
+
+        auto prott = prot & ~PROT_U & (PROT_R | PROT_W | PROT_X);
+        if (prott == 0b000 || prott == 0b010 || prott == 0b110)
+            return K_ENOSPC;
+
+        // Divide the memory into blocks of size 256T，512G, 1G, 2M, and 4K
+        for (uintptr_t vcaddr = vaddr, pcaddr = paddr; vcaddr < vaddr + size;)
         {
-            _ptes[i].v = 1;
-            _ptes[i].r = 1;
-            _ptes[i].w = 1;
-            _ptes[i].x = 1;
-            _ptes[i].ppn0 = 0;
-            _ptes[i].ppn1 = 0; // 30bits here
-            _ptes[i].ppn2 = i;
-            _ptes[i].template fit<sz>();
+            if constexpr (sz >= 57) // Only SV57 and SV64 support 256T
+            {
+                if ((vcaddr & 0xFFFFFFFFFFFF) == 0) // 256T aligned
+                {
+                    if (size - (vcaddr - vaddr) >= 1ULL << 48) // There are more than 256T to map
+                    {
+                        _map<48>(vcaddr, pcaddr, prot);
+                        vcaddr += 1ULL << 48;
+                        pcaddr += 1ULL << 48;
+                        continue;
+                    }
+                }
+            }
+
+            if constexpr (sz >= 48) // Only SV48, SV57 and SV64 support 512G
+            {
+                if ((vcaddr & 0x7FFFFFFFFF) == 0) // 512G aligned
+                {
+                    if (size - (vcaddr - vaddr) >= 1ULL << 39) // There are more than 512G to map
+                    {
+                        _map<39>(vcaddr, pcaddr, prot);
+                        vcaddr += 1ULL << 39;
+                        pcaddr += 1ULL << 39;
+                        continue;
+                    }
+                }
+            }
+
+            if ((vcaddr & 0x3FFFFFFF) == 0) // 1G aligned
+            {
+                if (size - (vcaddr - vaddr) >= 1ULL << 30) // There are more than 1G to map
+                {
+                    _map<30>(vcaddr, pcaddr, prot);
+                    vcaddr += 1ULL << 30;
+                    pcaddr += 1ULL << 30;
+                    continue;
+                }
+            }
+
+            if ((vcaddr & 0x1FFFFF) == 0) // 2M aligned
+            {
+                if (size - (vcaddr - vaddr) >= 1ULL << 21) // There are more than 2M to map
+                {
+                    _map<21>(vcaddr, pcaddr, prot);
+                    vcaddr += 1ULL << 21;
+                    pcaddr += 1ULL << 21;
+                    continue;
+                }
+            }
+
+            if ((vcaddr & 0xFFF) == 0) // 4K aligned
+            {
+                if (size - (vcaddr - vaddr) >= 1ULL << 12) // There are more than 4K to map
+                {
+                    _map<12>(vcaddr, pcaddr, prot);
+                    vcaddr += 1ULL << 12;
+                    pcaddr += 1ULL << 12;
+                    continue;
+                }
+            }
         }
 
-        _ptes[255] = _ptes[2]; // stack
+        return 0;
+    }
+
+    int unmap(uintptr_t vaddr, size_t size) override
+    {
+        return 0;
+    }
+
+    void apply() override
+    {
+        sfence_vma();
+    }
+
+  protected:
+    pte_t *_createPTE(int level, uintptr_t vaddr)
+    {
+        auto poff = ((vaddr_t *)&vaddr)->getVPN<sz>(level);
+        printf("Creating PTE for %lx @ L%i with poff = %li\n", vaddr, level, poff);
+        if (level == 0)
+            return _ptes + poff;                    // We have already created the root level
+        auto parent = _createPTE(level - 1, vaddr); // Create parent PTE first
+        printf("Original Parent PTE has value %lx\n", *(uint64_t *)parent);
+
+        pte_t *thisPTE = nullptr; // This level PTE 's base address
+        printf("Parent PTE.paddr = 0x%lx\n", parent->paddr());
+        if (parent->paddr() != 0) // this level already created, get base
+        {
+            thisPTE = (pte_t *)(parent->paddr());
+        }
+        else
+        {
+            thisPTE = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
+            parent->ppn((uintptr_t)thisPTE);
+            parent->v = 1;
+            parent->r = 0;
+            parent->w = 0;
+            parent->x = 0; // mark as a pointer
+            parent->template fit<sz>();
+            printf("Created new PTE at %lx\n", (uintptr_t)thisPTE);
+            printf("Now Parent PTE has value %lx\n", *(uint64_t *)parent);
+        }
+        return thisPTE + poff;
+    }
+
+    template <uint8_t blocksz> int _map(uintptr_t vaddr, uintptr_t paddr, int prot)
+    {
+        printf("* Mapping %lx to %lx with prot %i\n", vaddr, paddr, prot);
+        auto level = 0;
+        if constexpr (blocksz == 12) // 4K
+            level = 0;
+        else if constexpr (blocksz == 21) // 2M
+            level = -1;
+        else if constexpr (blocksz == 30) // 1G
+            level = -2;
+        else if constexpr (blocksz == 39) // 512G
+            level = -3;
+        else if constexpr (blocksz == 48) // 256T
+            level = -4;
+        else
+            return K_EINVAL;
+
+        if constexpr (sz == 39)
+            level += 2;
+        else if constexpr (sz == 48)
+            level += 3;
+        else if constexpr (sz == 57)
+            level += 4;
+        else
+            return K_EINVAL;
+
+        if (level < 0)
+            return K_EINVAL;
+
+        auto pte = _createPTE(level, vaddr);
+        printf("PTE got: %lx\n", (uintptr_t)pte);
+
+        if (pte->v)
+            return K_EALREADY;
+        pte->v = 1;
+        pte->r = prot & PROT_R ? 1 : 0;
+        pte->w = prot & PROT_W ? 1 : 0;
+        pte->x = prot & PROT_X ? 1 : 0;
+        pte->u = prot & PROT_U ? 1 : 0;
+
+        pte->ppn(paddr);
+        pte->template fit<sz>();
+        printf("Now PTE value: %lx\n",*(uintptr_t*)pte);
+        return 0;
     }
 
   private:

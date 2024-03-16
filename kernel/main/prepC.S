@@ -8,7 +8,7 @@
  */
 #include <sbi/riscv_asm.h>
 #include <sbi/riscv_encoding.h>
-#include <sbi/riscv_elf.h>
+
 #define __ASM_STR(x)	x
 
 #if __riscv_xlen == 64
@@ -47,30 +47,6 @@ _bss_zero:
 	REG_S	zero, (a4)
 	add	a4, a4, __SIZEOF_POINTER__
 	blt	a4, a5, _bss_zero
-
-	/* relocate  */
-# 	lla	t0, _link_start
-# 	REG_L	t0, 0(t0)
-# 	/* t1 shall has the address of _fw_start */
-# 	sub	t2, t1, t0
-# 	lla	t0, __rel_dyn_start
-# 	lla	t1, __rel_dyn_end
-# 	beq	t0, t1, _relocate_done
-# 2:
-# 	REG_L	t5, REGBYTES(t0)	/* t5 <-- relocation info:type */
-# 	li	t3, R_RISCV_RELATIVE	/* reloc type R_RISCV_RELATIVE */
-# 	bne	t5, t3, 3f
-# 	REG_L	t3, 0(t0)
-# 	REG_L	t5, (REGBYTES * 2)(t0)	/* t5 <-- addend */
-# 	add	t5, t5, t2
-# 	add	t3, t3, t2
-# 	REG_S	t5, 0(t3)		/* store runtime address to the GOT entry */
-
-# 3:
-# 	addi	t0, t0, (REGBYTES * 3)
-# 	blt	t0, t1, 2b
-# 	# j	_relocate_done
-# _relocate_done:
 
 _prep_boot:
 	/* Disable and clear all interrupts */
@@ -140,3 +116,5 @@ _boot_a1: // dtb address
 	RISCV_PTR	0
 _sys_stack_base:
 	RISCV_PTR	0
+_load_start:
+	RISCV_PTR   _kernel_start

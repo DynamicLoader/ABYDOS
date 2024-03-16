@@ -62,9 +62,9 @@ class VirtRoot : public SysRoot
 
 // We make a static instance of our driver, initialize and register it
 // Note that devices should be handled inside the class, not here
-static DRV_INSTALL_FUNC(K_PR_DRV_SYSROOT_BEGIN + 1) void drv_register()
-{
-    static VirtRoot drv;
-    DriverManager::addDriver(drv);
-    printf("Driver VirtRoot installed\n");
-}
+// static DRV_INSTALL_FUNC(K_PR_DRV_SYSROOT_BEGIN + 1) void drv_register()
+// {
+//     static VirtRoot drv;
+//     DriverManager::addDriver(drv);
+//     printf("Driver VirtRoot installed\n");
+// }

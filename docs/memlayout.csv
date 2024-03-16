@@ -1,0 +1,11 @@
+# General view,,,
+,,,
+Name,Desc,Start,End
+,,,
+Kernel,Kernel Space,0x0,VMA_LOW_TOP
+User,User Space,VMA_HIGH_BOTTOM,0xFFFFFFFFFFFFFFFF
+,,,
+,,,
+,,,
+,,,
+,,,
