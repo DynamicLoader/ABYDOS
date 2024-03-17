@@ -288,20 +288,23 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         // if (vaddr + size > (1ULL << sz) || paddr + size > (1ULL << sz))
         //     return -1;
 
-        auto prott = prot & ~PROT_U & (PROT_R | PROT_W | PROT_X);
+        auto prott = prot & (PROT_R | PROT_W | PROT_X);
         if (prott == 0b000 || prott == 0b010 || prott == 0b110)
             return K_ENOSPC;
 
+        auto rc = 0;
         // Divide the memory into blocks of size 256T，512G, 1G, 2M, and 4K
         for (uintptr_t vcaddr = vaddr, pcaddr = paddr; vcaddr < vaddr + size;)
         {
+            if (rc)
+                return rc;
             if constexpr (sz >= 57) // Only SV57 and SV64 support 256T
             {
                 if ((vcaddr & 0xFFFFFFFFFFFF) == 0) // 256T aligned
                 {
                     if (size - (vcaddr - vaddr) >= 1ULL << 48) // There are more than 256T to map
                     {
-                        _map<48>(vcaddr, pcaddr, prot);
+                        rc = _map<48>(vcaddr, pcaddr, prot);
                         vcaddr += 1ULL << 48;
                         pcaddr += 1ULL << 48;
                         continue;
@@ -315,7 +318,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                 {
                     if (size - (vcaddr - vaddr) >= 1ULL << 39) // There are more than 512G to map
                     {
-                        _map<39>(vcaddr, pcaddr, prot);
+                        rc = _map<39>(vcaddr, pcaddr, prot);
                         vcaddr += 1ULL << 39;
                         pcaddr += 1ULL << 39;
                         continue;
@@ -327,7 +330,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             {
                 if (size - (vcaddr - vaddr) >= 1ULL << 30) // There are more than 1G to map
                 {
-                    _map<30>(vcaddr, pcaddr, prot);
+                    rc = _map<30>(vcaddr, pcaddr, prot);
                     vcaddr += 1ULL << 30;
                     pcaddr += 1ULL << 30;
                     continue;
@@ -338,7 +341,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             {
                 if (size - (vcaddr - vaddr) >= 1ULL << 21) // There are more than 2M to map
                 {
-                    _map<21>(vcaddr, pcaddr, prot);
+                    rc = _map<21>(vcaddr, pcaddr, prot);
                     vcaddr += 1ULL << 21;
                     pcaddr += 1ULL << 21;
                     continue;
@@ -349,7 +352,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             {
                 if (size - (vcaddr - vaddr) >= 1ULL << 12) // There are more than 4K to map
                 {
-                    _map<12>(vcaddr, pcaddr, prot);
+                    rc = _map<12>(vcaddr, pcaddr, prot);
                     vcaddr += 1ULL << 12;
                     pcaddr += 1ULL << 12;
                     continue;
@@ -357,12 +360,82 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             }
         }
 
-        return 0;
+        return rc;
     }
 
     int unmap(uintptr_t vaddr, size_t size) override
     {
-        return 0;
+        if (vaddr & 0xFFF || size & 0xFFF) // Not aligned
+            return K_EINVAL;
+        if (size == 0)
+            return 0;
+        if (vaddr + size < vaddr) // overflow
+            return K_EINVALID_ADDR;
+
+        auto rc = 0;
+
+        for (uintptr_t vcaddr = vaddr; vcaddr < vaddr + size;)
+        {
+            if (rc)
+                return rc;
+            if constexpr (sz >= 57) // Only SV57 and SV64 support 256T
+            {
+                if ((vcaddr & 0xFFFFFFFFFFFF) == 0) // 256T aligned
+                {
+                    if (size - (vcaddr - vaddr) >= 1ULL << 48) // There are more than 256T to map
+                    {
+                        rc = _unmap<48>(vcaddr);
+                        vcaddr += 1ULL << 48;
+                        continue;
+                    }
+                }
+            }
+
+            if constexpr (sz >= 48) // Only SV48, SV57 and SV64 support 512G
+            {
+                if ((vcaddr & 0x7FFFFFFFFF) == 0) // 512G aligned
+                {
+                    if (size - (vcaddr - vaddr) >= 1ULL << 39) // There are more than 512G to map
+                    {
+                        rc = _unmap<39>(vcaddr);
+                        vcaddr += 1ULL << 39;
+                        continue;
+                    }
+                }
+            }
+
+            if ((vcaddr & 0x3FFFFFFF) == 0) // 1G aligned
+            {
+                if (size - (vcaddr - vaddr) >= 1ULL << 30) // There are more than 1G to map
+                {
+                    rc = _unmap<30>(vcaddr);
+                    vcaddr += 1ULL << 30;
+                    continue;
+                }
+            }
+
+            if ((vcaddr & 0x1FFFFF) == 0) // 2M aligned
+            {
+                if (size - (vcaddr - vaddr) >= 1ULL << 21) // There are more than 2M to map
+                {
+                    rc = _unmap<21>(vcaddr);
+                    vcaddr += 1ULL << 21;
+                    continue;
+                }
+            }
+
+            if ((vcaddr & 0xFFF) == 0) // 4K aligned
+            {
+                if (size - (vcaddr - vaddr) >= 1ULL << 12) // There are more than 4K to map
+                {
+                    rc = _unmap<12>(vcaddr);
+                    vcaddr += 1ULL << 12;
+                    continue;
+                }
+            }
+        }
+
+        return rc;
     }
 
     void apply() override
@@ -371,6 +444,42 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     }
 
   protected:
+    static constexpr int _getMaxLevel()
+    {
+        if constexpr (sz == 39)
+            return 2;
+        else if constexpr (sz == 48)
+            return 3;
+        else if constexpr (sz == 57)
+            return 4;
+        else
+            return K_EINVAL;
+    }
+
+    template <uint8_t blocksz> int _calcLevel()
+    {
+        auto level = 0;
+        if constexpr (blocksz == 12) // 4K
+            level = 0;
+        else if constexpr (blocksz == 21) // 2M
+            level = -1;
+        else if constexpr (blocksz == 30) // 1G
+            level = -2;
+        else if constexpr (blocksz == 39) // 512G
+            level = -3;
+        else if constexpr (blocksz == 48) // 256T
+            level = -4;
+        else
+            return K_EINVAL;
+
+        level += _getMaxLevel();
+
+        if (level < 0)
+            return K_EINVAL;
+
+        return level;
+    }
+
     pte_t *_createPTE(int level, uintptr_t vaddr)
     {
         auto poff = ((vaddr_t *)&vaddr)->getVPN<sz>(level);
@@ -401,34 +510,38 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         return thisPTE + poff;
     }
 
+    pte_t *_getPTE(int level, uintptr_t vaddr)
+    {
+        auto poff = ((vaddr_t *)&vaddr)->getVPN<sz>(level);
+        if (level == 0)
+            return _ptes + poff;
+        auto parent = _getPTE(level - 1, vaddr);
+        return (pte_t *)(parent->paddr()) + poff;
+    }
+
+    int _removePTE(int level, uintptr_t vaddr)
+    {
+        auto pte = _getPTE(level, vaddr);
+        if (!pte->v)
+            return K_EALREADY;
+        pte->v = 0;
+        pte->ppn(0);
+        pte->template fit<sz>();
+        if (level != _getMaxLevel())
+        { // Next level already unused, free it
+            auto pteBase = (pte_t *)(pte->paddr());
+            alignedFree(pteBase);
+        }
+        return (level == 0 ? 0 : _removePTE(level - 1, vaddr));
+    }
+
     template <uint8_t blocksz> int _map(uintptr_t vaddr, uintptr_t paddr, int prot)
     {
         printf("* Mapping %lx to %lx with prot %i\n", vaddr, paddr, prot);
-        auto level = 0;
-        if constexpr (blocksz == 12) // 4K
-            level = 0;
-        else if constexpr (blocksz == 21) // 2M
-            level = -1;
-        else if constexpr (blocksz == 30) // 1G
-            level = -2;
-        else if constexpr (blocksz == 39) // 512G
-            level = -3;
-        else if constexpr (blocksz == 48) // 256T
-            level = -4;
-        else
-            return K_EINVAL;
 
-        if constexpr (sz == 39)
-            level += 2;
-        else if constexpr (sz == 48)
-            level += 3;
-        else if constexpr (sz == 57)
-            level += 4;
-        else
-            return K_EINVAL;
-
+        auto level = _calcLevel<blocksz>();
         if (level < 0)
-            return K_EINVAL;
+            return level;
 
         auto pte = _createPTE(level, vaddr);
         printf("PTE got: %lx\n", (uintptr_t)pte);
@@ -440,11 +553,23 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         pte->w = prot & PROT_W ? 1 : 0;
         pte->x = prot & PROT_X ? 1 : 0;
         pte->u = prot & PROT_U ? 1 : 0;
+        pte->g = prot & PROT_G ? 1 : 0;
 
         pte->ppn(paddr);
         pte->template fit<sz>();
-        printf("Now PTE value: %lx\n",*(uintptr_t*)pte);
+        printf("Now PTE value: %lx\n", *(uintptr_t *)pte);
         return 0;
+    }
+
+    template <uint8_t blocksz> int _unmap(uintptr_t vaddr)
+    {
+        printf("* Unmapping %lx\n", vaddr);
+        auto level = _calcLevel<blocksz>();
+
+        if (level < 0)
+            return level;
+
+        return _removePTE(level, vaddr);
     }
 
   private:

@@ -125,6 +125,14 @@ int k_premain_0(void **sys_stack_base)
     *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
     printf("We modified from mapped, now the original value is %li\n", *a);
 
+    // printf("Now we unmap it\n");
+    // sysmmu->unmap((uintptr_t)a | 0xFFFFFFC000000000, 4096);
+    // sysmmu->apply();
+    // printf("Original value of a: %li\n", *a);
+    // printf("Accessing to mapped a (hang!)\n");
+    // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1;
+
+    // never get run
 
     *sys_stack_base = (void *)sysmmu->getVMALowerTop();
     printf("> Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
