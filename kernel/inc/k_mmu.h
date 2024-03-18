@@ -26,6 +26,8 @@ class MMUBase
      */
     virtual void switchASID() = 0;
 
+    virtual void getSATP(void *) = 0;
+
     virtual int map(uintptr_t vaddr, uintptr_t paddr, size_t size, int prot) = 0;
     virtual int unmap(uintptr_t vaddr, size_t size) = 0;
 
@@ -39,7 +41,7 @@ class RV64MMUBase : public MMUBase
 {
 
   public:
-    bool enable(bool enable)
+    bool enable(bool enable) override
     {
         if (enable)
         {
@@ -57,7 +59,7 @@ class RV64MMUBase : public MMUBase
         }
     }
 
-    void switchASID()
+    void switchASID() override
     {
         csr_write(CSR_SATP, *(uint64_t *)(&_satp));
         // No need to sfence.vma
@@ -221,6 +223,11 @@ class RV64MMUBase : public MMUBase
         return true;
     }
 
+    void getSATP(void * ret) override
+    {
+        *(satp_t *)ret = _satp;
+    }
+
   private: // data
     satp_t _satp;
 };
@@ -300,7 +307,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                 return rc;
             if constexpr (sz >= 57) // Only SV57 and SV64 support 256T
             {
-                if ((vcaddr & 0xFFFFFFFFFFFF) == 0) // 256T aligned
+                if ((vcaddr & 0xFFFFFFFFFFFF) == 0 && (pcaddr & 0xFFFFFFFFFFFF) == 0) // 256T aligned
                 {
                     if (size - (vcaddr - vaddr) >= 1ULL << 48) // There are more than 256T to map
                     {
@@ -314,7 +321,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
             if constexpr (sz >= 48) // Only SV48, SV57 and SV64 support 512G
             {
-                if ((vcaddr & 0x7FFFFFFFFF) == 0) // 512G aligned
+                if ((vcaddr & 0x7FFFFFFFFF) == 0 && (pcaddr & 0x7FFFFFFFFF) == 0) // 512G aligned
                 {
                     if (size - (vcaddr - vaddr) >= 1ULL << 39) // There are more than 512G to map
                     {
@@ -326,7 +333,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                 }
             }
 
-            if ((vcaddr & 0x3FFFFFFF) == 0) // 1G aligned
+            if ((vcaddr & 0x3FFFFFFF) == 0 && (pcaddr & 0x3FFFFFFF) == 0) // 1G aligned
             {
                 if (size - (vcaddr - vaddr) >= 1ULL << 30) // There are more than 1G to map
                 {
@@ -337,7 +344,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                 }
             }
 
-            if ((vcaddr & 0x1FFFFF) == 0) // 2M aligned
+            if ((vcaddr & 0x1FFFFF) == 0 && (pcaddr & 0x1FFFFF) == 0) // 2M aligned
             {
                 if (size - (vcaddr - vaddr) >= 1ULL << 21) // There are more than 2M to map
                 {
@@ -348,7 +355,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                 }
             }
 
-            if ((vcaddr & 0xFFF) == 0) // 4K aligned
+            if ((vcaddr & 0xFFF) == 0 && (pcaddr & 0xFFF) == 0) // 4K aligned
             {
                 if (size - (vcaddr - vaddr) >= 1ULL << 12) // There are more than 4K to map
                 {
@@ -358,6 +365,8 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                     continue;
                 }
             }
+
+            return K_EINVALID_ADDR;
         }
 
         return rc;
@@ -433,6 +442,8 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
                     continue;
                 }
             }
+
+            return K_EINVALID_ADDR;
         }
 
         return rc;
@@ -483,14 +494,14 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     pte_t *_createPTE(int level, uintptr_t vaddr)
     {
         auto poff = ((vaddr_t *)&vaddr)->getVPN<sz>(level);
-        printf("Creating PTE for %lx @ L%i with poff = %li\n", vaddr, level, poff);
+        // printf("Creating PTE for %lx @ L%i with poff = %li\n", vaddr, level, poff);
         if (level == 0)
             return _ptes + poff;                    // We have already created the root level
         auto parent = _createPTE(level - 1, vaddr); // Create parent PTE first
-        printf("Original Parent PTE has value %lx\n", *(uint64_t *)parent);
+        // printf("Original Parent PTE has value %lx\n", *(uint64_t *)parent);
 
         pte_t *thisPTE = nullptr; // This level PTE 's base address
-        printf("Parent PTE.paddr = 0x%lx\n", parent->paddr());
+        // printf("Parent PTE.paddr = 0x%lx\n", parent->paddr());
         if (parent->paddr() != 0) // this level already created, get base
         {
             thisPTE = (pte_t *)(parent->paddr());
@@ -504,8 +515,8 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             parent->w = 0;
             parent->x = 0; // mark as a pointer
             parent->template fit<sz>();
-            printf("Created new PTE at %lx\n", (uintptr_t)thisPTE);
-            printf("Now Parent PTE has value %lx\n", *(uint64_t *)parent);
+            // printf("Created new PTE at %lx\n", (uintptr_t)thisPTE);
+            // printf("Now Parent PTE has value %lx\n", *(uint64_t *)parent);
         }
         return thisPTE + poff;
     }
@@ -529,7 +540,9 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         pte->template fit<sz>();
         if (level != _getMaxLevel())
         { // Next level already unused, free it
+
             auto pteBase = (pte_t *)(pte->paddr());
+            printf("removing pte memory at %lx\n", (uintptr_t)pteBase);
             alignedFree(pteBase);
         }
         return (level == 0 ? 0 : _removePTE(level - 1, vaddr));
@@ -544,7 +557,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
             return level;
 
         auto pte = _createPTE(level, vaddr);
-        printf("PTE got: %lx\n", (uintptr_t)pte);
+        // printf("PTE got: %lx\n", (uintptr_t)pte);
 
         if (pte->v)
             return K_EALREADY;
@@ -557,7 +570,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
         pte->ppn(paddr);
         pte->template fit<sz>();
-        printf("Now PTE value: %lx\n", *(uintptr_t *)pte);
+        // printf("Now PTE value: %lx\n", *(uintptr_t *)pte);
         return 0;
     }
 
@@ -569,7 +582,14 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         if (level < 0)
             return level;
 
-        return _removePTE(level, vaddr);
+        // return _removePTE(level, vaddr);
+        auto pte = _getPTE(level, vaddr);
+        if (!pte->v)
+            return K_EALREADY;
+        pte->v = 0;
+        pte->ppn(0);
+        pte->template fit<sz>();
+        return 0;
     }
 
   private:

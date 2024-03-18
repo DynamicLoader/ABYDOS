@@ -18,7 +18,9 @@ SysRoot *sysroot = nullptr;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 
-int k_premain_0(void **sys_stack_base)
+MMUBase *hartmmu[8] = {nullptr};
+
+int k_boot(void **sys_stack_base)
 {
 #ifdef DEBUG
     std::cout << "Dumping Device tree..." << std::endl;
@@ -70,7 +72,6 @@ int k_premain_0(void **sys_stack_base)
     }
 
     // Setup MMU
-
     auto rc = 0;
     sysmmu = new SV39MMU(0);
     // Lower 4G: Direct mapping
@@ -78,16 +79,6 @@ int k_premain_0(void **sys_stack_base)
     if (rc < 0)
     {
         std::cout << "[E] Failed to map lower 4G: " << rc << std::endl;
-        return K_EFAIL;
-    }
-
-    // Top of lower VMA: Kernel Stack
-    auto x = sysmem->availableMem().rbegin(); // assume that is sorted by start address
-    rc = sysmmu->map(sysmmu->getVMALowerTop() - x->second, x->first, x->second,
-                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
-    if (rc < 0)
-    {
-        std::cout << "[E] Failed to map kernel stack: " << rc << std::endl;
         return K_EFAIL;
     }
 
@@ -99,47 +90,59 @@ int k_premain_0(void **sys_stack_base)
     }
     std::cout << "OK!" << std::endl;
 
-    // int a = 0;
-    // printf("Original addr of a: 0x%lx with value %i\n", (uintptr_t)&a, a);
-
-    // int *pa = (int*)((((uintptr_t)(&a)) | 0xFFFFFFC000000000) + 0x80000000);
-
-    // for(int i = 0;i< 256;++i){
-    //     printf("Mapped addr of a: 0x%lx\n", (uintptr_t)pa);
-    //     printf("Mapped value of a: %i\n", *pa);
-    //     *pa += 1;
-    //     pa += 0x40000000 / sizeof(int);
-    // }
-
-    // printf("We modified from mapped, now the original value is %i\n", a);
-
-    auto a = alignedMalloc<long>(4096, 4096);
-    printf("Original addr of a: 0x%lx\n", (uintptr_t)a);
-    *a = 1145141919810;
-    printf("Original value of a: %li\n", *a);
-    sysmmu->map((uintptr_t)a | 0xFFFFFFC000000000, (uintptr_t)a, 4096, MMUBase::PROT_W | MMUBase::PROT_R);
-    sysmmu->apply();
-
-    printf("Mapped addr of a: 0x%lx\n", (uintptr_t)a | 0xFFFFFFC000000000);
-    printf("Mapped value of a: %li\n", *(long *)((uintptr_t)a | 0xFFFFFFC000000000));
-    *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
-    printf("We modified from mapped, now the original value is %li\n", *a);
-
-    // printf("Now we unmap it\n");
-    // sysmmu->unmap((uintptr_t)a | 0xFFFFFFC000000000, 4096);
-    // sysmmu->apply();
+    // auto a = alignedMalloc<long>(4096, 4096);
+    // printf("Original addr of a: 0x%lx\n", (uintptr_t)a);
+    // *a = 1145141919810;
     // printf("Original value of a: %li\n", *a);
-    // printf("Accessing to mapped a (hang!)\n");
-    // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1;
+    // sysmmu->map((uintptr_t)a | 0xFFFFFFC000000000, (uintptr_t)a, 4096, MMUBase::PROT_W | MMUBase::PROT_R);
+    // sysmmu->apply();
 
-    // never get run
+    // printf("Mapped addr of a: 0x%lx\n", (uintptr_t)a | 0xFFFFFFC000000000);
+    // printf("Mapped value of a: %li\n", *(long *)((uintptr_t)a | 0xFFFFFFC000000000));
+    // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
+    // printf("We modified from mapped, now the original value is %li\n", *a);
+
+    // Create mmu for each hart
+    for (int i = 0; i < 8; i++)
+    {
+        hartmmu[i] = new SV39MMU(i);
+        auto rc = hartmmu[i]->map(0, 0, 4 * 1024 * 1048576ULL,
+                                  MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X |
+                                      MMUBase::PROT_G); // Should be cloned from sysmmu, test here
+        if (rc)
+        {
+            std::cout << "[E] Failed to map lower 4G for hart " << i << ": " << rc << std::endl;
+            return K_EFAIL;
+        }
+        auto kstack = alignedMalloc<void>(K_CONFIG_STACK_SIZE, 4096);
+        rc = hartmmu[i]->map(hartmmu[i]->getVMALowerTop() - K_CONFIG_STACK_SIZE, (uintptr_t)kstack, K_CONFIG_STACK_SIZE,
+                             MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
+        if (rc)
+        {
+            std::cout << "[E] Failed to map kernel stack for hart " << i << ": " << rc << std::endl;
+            return K_EFAIL;
+        }
+        // Here we do not enable MMU for harts, as they will be enabled by themselves
+    }
+
+    extern char _KERNEL_BOOT_STACK_SIZE;
+    size_t boot_stack_size = (size_t)&_KERNEL_BOOT_STACK_SIZE;
+    auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
+    rc = sysmmu->map(sysmmu->getVMALowerTop() - boot_stack_size, (uintptr_t)kstack, boot_stack_size,
+                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
+    if (rc < 0)
+    {
+        std::cout << "[E] Failed to map global kernel stack: " << rc << std::endl;
+        return K_EFAIL;
+    }
+    sysmmu->apply();
 
     *sys_stack_base = (void *)sysmmu->getVMALowerTop();
     printf("> Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
     return 0;
 }
 
-int k_main(int hartid)
+int k_boot_perip()
 {
     // Probing peripheral devices
     std::cout << "> Probing peripheral devices" << std::endl;
@@ -161,6 +164,7 @@ int k_main(int hartid)
         {
             std::cout << "Switching stdout to " << sysroot->stdout_path() << std::endl;
             k_stdout_func = [stdouthdl, uart](const char *buf, int size) -> int {
+                // uart->write(stdouthdl, "- ", 2);
                 return uart->write(stdouthdl, buf, size);
             };
             k_stdout_switched = true;
@@ -168,9 +172,83 @@ int k_main(int hartid)
         }
     }
 
+    // Prepare sysmmu for a global kernel stack
+    // extern char _KERNEL_BOOT_STACK_SIZE;
+    // size_t boot_stack_size = (size_t)&_KERNEL_BOOT_STACK_SIZE;
+    // sysmmu->unmap(sysmmu->getVMALowerTop() - boot_stack_size, boot_stack_size);
+
+    return 0;
+}
+
+int k_boot_harts(int boot_hartid)
+{
+    extern char _start_hart;
+    printf("> Booting harts...\n");
+    for (int i = 0; i < 8; i++)
+    {
+        if (i == boot_hartid)
+            continue;
+        auto rc = SBIF::HSM::getHartState(i);
+        if (rc < 0) // invalid core, skip
+            continue;
+        if (rc == SBI_HSM_STATE_STOPPED)
+        {
+            printf("Starting hart %d...\n", i);
+            unsigned long satp;
+            hartmmu[i]->getSATP(&satp);
+            rc = SBIF::HSM::startHart(i, (uintptr_t)&_start_hart, satp);
+            if (rc < 0)
+            {
+                std::cout << "[E] Failed to start hart " << i << ": " << SBIF::getErrorStr(rc) << std::endl;
+                return K_EFAIL;
+            }
+        }
+        else
+        {
+            printf("Hart %d is in a state of %ld\n", i, rc);
+        }
+        // std::cout << "Hart #" << i << " state: " << SBIF::HSM::getHartState(i) << std::endl;
+    }
+    return 0;
+}
+
+// to be run by each hart
+int k_main(int hartid)
+{
+    printf("Hello from hart %d!\n", hartid);
     // auto ret = SBIF::SRST::reset(SBIF::SRST::WarmReboot, SBIF::SRST::NoReason);
     // std::cout << "Reset: " << SBIF::getErrorStr(ret) << std::endl;
     return 0;
+}
+
+int k_after_main(int hartid, int main_ret)
+{
+    if (hartid < 0)
+    {
+        printf("A hart has returned with %d\n", main_ret);
+        printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
+    }
+    else
+    {
+        printf("\n> Waiting for other harts to return...\n");
+        for (int flag = 0; flag;) // a timeout can be added here
+        {
+            for (int i = 0; i < 8; ++i)
+            {
+                if (i == hartid)
+                    continue;
+                auto rc = SBIF::HSM::getHartState(i);
+                if (rc < 0) // invalid core, skip
+                    continue;
+                if (rc != SBI_HSM_STATE_STOPPED)
+                {
+                    flag = 1;
+                }
+            }
+        }
+        k_stdout_switched = false;
+    }
+    return main_ret; // pass to the lower
 }
 
 // Hook with libc

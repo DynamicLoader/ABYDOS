@@ -3,6 +3,12 @@
 
 #include "sbi/sbi_ecall_interface.h"
 
+// CONFIG
+
+#define K_CONFIG_STACK_SIZE 8 * 1024 // 8K
+
+// END CONFIG
+
 // Priority of the driver and global constructors
 #define K_PR_INIT_DRV_LIST 101
 

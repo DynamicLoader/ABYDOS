@@ -32,7 +32,7 @@ _start:
 	lla	a3, _hart_lottery
 	li	a2, 1
 	amoadd.w a3, a2, (a3)
-	bnez	a3, _start_hang
+	bnez	a3, _start_hang // in case multi core start at the same time
 
 	/* Save a0 and a1 */
 	lla	a3, _boot_a0
@@ -56,6 +56,7 @@ _prep_boot:
 	/* Setup boot stack */
 	lla	a3, _kernel_end
 	lla	a4, _KERNEL_BOOT_STACK_SIZE /* this is fake a address provided from ld */
+	add a4, a4, a4 /* double the size */
 	add	sp, a3, a4
 	lla a3, _sys_stack_base
 	REG_S	sp, 0(a3)
@@ -65,12 +66,28 @@ _prep_boot:
 	REG_L	a0, 0(a3)
 	call k_early_boot
 
-	bne a0, zero, _kernel_hang 
+	bne a0, zero, _kernel_exit 
 
 	/* Boot stage 1: Start Kernel premain */
 	lla a0, _sys_stack_base
-	call k_premain_0
-	bne a0, zero, _kernel_hang
+	call k_boot
+	bne a0, zero, _kernel_exit
+
+	/* save system SATP to be used by other hart */
+	lla 	a3, _sys_satp
+	csrr 	a2, CSR_SATP
+	REG_S 	a2, 0(a3)
+
+	/* Boot Stage 2 */
+	call k_boot_perip
+	bne a0, zero, _kernel_exit
+
+	/* recover a0 for boot hart */
+	lla	a3, _boot_a0
+	REG_L	a0, 0(a3)
+
+	/* Boot Stage 3 */
+	call k_boot_harts
 
 _start_warm:
 	/* Disable and clear all interrupts */
@@ -78,21 +95,26 @@ _start_warm:
 	csrw	CSR_SIP, zero
 
 	/* Setup exception vectors */
-	lla	a3, _kernel_hang
+	lla	a3, _start_hang
 	csrw	CSR_STVEC, a3
 
 	/* Setup system stack base */
 	lla a3, _sys_stack_base
 	REG_L sp, 0(a3)
 
-	/* Boot stage 2: Start Main */
 	lla	a3, _boot_a0
 	REG_L	a0, 0(a3)
+
 	call	k_main
 
 	/* And the last thing: after main */
-_kernel_hang:
+_kernel_exit:
+	add a1, a0, zero
+	lla a3, _boot_a0
+	REG_L a0, 0(a3)
 	call k_after_main
+
+	call k_clearup
 
 	/* We don't expect to reach here hence just hang */
 	j	_start_hang
@@ -104,8 +126,40 @@ _start_hang:
 	wfi
 	j	_start_hang
 
+	.section .entry, "ax", %progbits
+	.align 3
+	.globl _start_hart
+_start_hart:
+	/* a0: hartid a1: value of satp */
+	csrw  CSR_SATP, a1
+	sfence.vma zero, zero
+
+	/* Disable and clear all interrupts */
+	csrw	CSR_SIE, zero
+	csrw	CSR_SIP, zero
+
+	/* Setup exception vectors */
+	lla	a3, _start_hang
+	csrw	CSR_STVEC, a3
+
+	/* Setup system stack base */
+	lla a3, _sys_stack_base
+	REG_L sp, 0(a3)
+
+	call	k_main
+
+	add 	a1, a0, zero
+	li 		a0, -1
+	call 	k_after_main
+
+	j _start_hang
+
+
 	.section .data
 	.align	3
+# _hart_satp:
+# 	RISCV_PTR	0
+
 _hart_lottery:
 	RISCV_PTR	0
 # _link_start:
@@ -116,5 +170,5 @@ _boot_a1: // dtb address
 	RISCV_PTR	0
 _sys_stack_base:
 	RISCV_PTR	0
-_load_start:
-	RISCV_PTR   _kernel_start
+_sys_satp:
+	RISCV_PTR	0

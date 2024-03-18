@@ -113,7 +113,8 @@ class DriverManager
     static long getDrvByPath(const void *fdt, const char *path, void **drv);
 
     friend int k_main(int);
-    friend int k_premain_0(void**);
+    friend int k_boot(void**);
+    friend int k_boot_perip();
 
   private:
     static std::vector<DriverBase *> _drvlist;

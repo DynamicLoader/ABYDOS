@@ -254,7 +254,7 @@ class Drv_Uart8250 : public DriverChar
         }
 
         // printf("UART8250 write\n");
-        return 0;
+        return len;
     }
 
     int ioctl(long handler, int cmd, void *arg) override

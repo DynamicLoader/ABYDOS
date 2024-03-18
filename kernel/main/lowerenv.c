@@ -13,13 +13,11 @@
 
 #include <stdio.h>
 
-
 #include "k_defs.h"
 #include "llenv.h"
 #include "libfdt.h"
 
-
-void* k_fdt = NULL;
+void *k_fdt = NULL;
 
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
                         unsigned long arg3, unsigned long arg4, unsigned long arg5)
@@ -43,10 +41,12 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1
 
 extern int _write(int fd, char *buf, int size);
 extern _Bool k_stdout_switched;
+unsigned long k_heap_max = 0;
+// extern void *end;
 
 void *_sbrk(ptrdiff_t incr)
 {
-    _write(1, "_sbrk called\n", 14);
+    // _write(1, "_sbrk called\n", 14);
 
     extern char end asm("end"); /* Defined by the linker.  */
     static char *heap_end;
@@ -66,6 +66,8 @@ void *_sbrk(ptrdiff_t incr)
     // }
 
     heap_end += incr;
+    if(heap_end - &end > k_heap_max)
+        k_heap_max = heap_end - &end;
 
     return (void *)prev_heap_end;
 }
@@ -94,13 +96,13 @@ void *_sbrk(ptrdiff_t incr)
 // }
 
 // kernel init
-int k_early_boot(const void* fdt)
+int k_early_boot(const void *fdt)
 {
     printf("\n===== Entered Test Kernel =====\n");
 
     // Copy fdt to heap
     k_fdt = malloc(fdt_totalsize(fdt));
-    if(!k_fdt)
+    if (!k_fdt)
     {
         printf("Failed to allocate memory for FDT\n");
         return K_ENOMEM;
@@ -123,7 +125,7 @@ int k_early_boot(const void* fdt)
 }
 
 // kernel exit
-void k_after_main(int main_ret)
+void k_clearup(int main_ret)
 {
     k_stdout_switched = false; // switching back to default stdout
     printf("\nReached k_after_main, clearing up...\n");
@@ -136,5 +138,7 @@ void k_after_main(int main_ret)
     for (__init_func_ptr *func = _fini_array_start; func != _fini_array_end; func++)
         (*func)();
 
+    extern char end asm("end");
+    printf("* Kernel heap usage: %li\n", k_heap_max);
     printf("===== Test Kernel exited with %i =====\n", main_ret);
 }

@@ -3,11 +3,15 @@
 #define __K_MAIN_H__
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-int k_premain_0(void**);
-int k_main(int hartid);
+    int k_boot(void **);
+    int k_boot_perip();
+    int k_boot_harts(int);
+    int k_main(int hartid);
+    int k_after_main(int,int);
 
 #ifdef __cplusplus
 }
