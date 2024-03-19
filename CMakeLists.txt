@@ -54,7 +54,9 @@ target_compile_options(AbydOS_KNL
     PUBLIC -mabi=${PL_ABI}
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
-    PUBLIC -DDEBUG
+    # PUBLIC -DDEBUG
+    PUBLIC -D__DYNAMIC_REENT__
+    # PUBLIC -D_RETARGETABLE_LOCKING
     # PUBLIC -D_KERNEL_STACK_SIZE=${KernelStackSize}
 )
 

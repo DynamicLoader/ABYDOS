@@ -6,6 +6,7 @@
 #include <sbi/riscv_encoding.h>
 #include "riscv_asm.h"
 #include <stdint.h>
+#include <reent.h>
 
 
 #define K_FDT_MAX_SIZE 65536
@@ -13,6 +14,13 @@
 struct sbiret {
   long error;
   long value;
+};
+
+// At most _KERNEL_HART_LOCAL_DATA_SIZE bytes
+struct hartLocal_t
+{
+    int hartid;
+    struct _reent reent;
 };
 
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0,
@@ -23,6 +31,6 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0,
 // extern uint8_t k_fdt[K_FDT_MAX_SIZE];
 extern void* k_fdt;
 
-
+void *k_getHartLocal();
 
 #endif

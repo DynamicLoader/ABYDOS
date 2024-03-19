@@ -12,6 +12,7 @@
  */
 
 #include <stdio.h>
+// #include <threads.h>
 
 #include "k_defs.h"
 #include "llenv.h"
@@ -66,34 +67,11 @@ void *_sbrk(ptrdiff_t incr)
     // }
 
     heap_end += incr;
-    if(heap_end - &end > k_heap_max)
+    if (heap_end - &end > k_heap_max)
         k_heap_max = heap_end - &end;
 
     return (void *)prev_heap_end;
 }
-
-// static int split_args(char *in, const char **out) // Out of buffer to be fixed
-// {
-//     int in_quotes = 0;
-//     int count = 0;
-//     out[count] = in;
-
-//     for (; *in; ++in)
-//     {
-//         if (*in == '\"')
-//         {
-//             in_quotes = !in_quotes;
-//             continue;
-//         }
-//         if (*in == ' ' && !in_quotes)
-//         {
-//             *in = '\0';
-//             out[++(count)] = in + 1;
-//         }
-//     }
-//     (count)++; // always return +1
-//     return count;
-// }
 
 // kernel init
 int k_early_boot(const void *fdt)
@@ -127,7 +105,7 @@ int k_early_boot(const void *fdt)
 // kernel exit
 void k_clearup(int main_ret)
 {
-    k_stdout_switched = false; // switching back to default stdout
+    // k_stdout_switched = false; // switching back to default stdout
     printf("\nReached k_after_main, clearing up...\n");
 
     extern void __cxa_finalize(void *f); // in k_cxxabi.h
@@ -141,4 +119,11 @@ void k_clearup(int main_ret)
     extern char end asm("end");
     printf("* Kernel heap usage: %li\n", k_heap_max);
     printf("===== Test Kernel exited with %i =====\n", main_ret);
+}
+
+void *k_getHartLocal()
+{
+    extern uintptr_t _sys_stack_base;
+    extern char _KERNEL_HART_LOCAL_DATA_SIZE;
+    return (void *)(_sys_stack_base - (uintptr_t)&_KERNEL_HART_LOCAL_DATA_SIZE);
 }

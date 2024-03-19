@@ -257,6 +257,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     }
     ~RV64MMU()
     {
+        printf("Freeing ptes at %lx\n", (uintptr_t)_ptes);
         alignedFree(_ptes);
     }
 
@@ -368,7 +369,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
             return K_EINVALID_ADDR;
         }
-
+        printf("Mapped %lx to %lx with prot %i\n", vaddr, paddr, prot);
         return rc;
     }
 
@@ -445,7 +446,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
             return K_EINVALID_ADDR;
         }
-
+        printf("Unmapped %lx\n", vaddr);
         return rc;
     }
 
@@ -550,7 +551,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
     template <uint8_t blocksz> int _map(uintptr_t vaddr, uintptr_t paddr, int prot)
     {
-        printf("* Mapping %lx to %lx with prot %i\n", vaddr, paddr, prot);
+        // printf("* Mapping %lx to %lx with prot %i\n", vaddr, paddr, prot);
 
         auto level = _calcLevel<blocksz>();
         if (level < 0)
@@ -576,7 +577,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
     template <uint8_t blocksz> int _unmap(uintptr_t vaddr)
     {
-        printf("* Unmapping %lx\n", vaddr);
+        // printf("* Unmapping %lx\n", vaddr);
         auto level = _calcLevel<blocksz>();
 
         if (level < 0)

@@ -78,7 +78,7 @@ _prep_boot:
 	csrr 	a2, CSR_SATP
 	REG_S 	a2, 0(a3)
 
-	/* Boot Stage 2 */
+	/* Boot Stage 2: setup perips */
 	call k_boot_perip
 	bne a0, zero, _kernel_exit
 
@@ -86,10 +86,14 @@ _prep_boot:
 	lla	a3, _boot_a0
 	REG_L	a0, 0(a3)
 
-	/* Boot Stage 3 */
+	/* Boot Stage 3: boot other harts */
 	call k_boot_harts
 
 _start_warm:
+	// boot hart satp is returned in a0
+	csrw CSR_SATP, a0
+	sfence.vma zero, zero
+
 	/* Disable and clear all interrupts */
 	csrw	CSR_SIE, zero
 	csrw	CSR_SIP, zero
@@ -101,18 +105,32 @@ _start_warm:
 	/* Setup system stack base */
 	lla a3, _sys_stack_base
 	REG_L sp, 0(a3)
+	lla a3, _KERNEL_HART_LOCAL_DATA_SIZE
+	sub sp, sp, a3
 
 	lla	a3, _boot_a0
 	REG_L	a0, 0(a3)
 
+	call  	k_premain
+
 	call	k_main
 
 	/* And the last thing: after main */
-_kernel_exit:
+
 	add a1, a0, zero
 	lla a3, _boot_a0
 	REG_L a0, 0(a3)
 	call k_after_main
+
+_kernel_exit:
+	/* recover to global context */
+	lla a3, _sys_satp
+	REG_L a2, 0(a3)
+	csrw CSR_SATP, a2
+	sfence.vma zero, zero
+
+	lla a3, _sys_stack_base
+	REG_L sp, 0(a3)
 
 	call k_clearup
 
@@ -145,6 +163,10 @@ _start_hart:
 	/* Setup system stack base */
 	lla a3, _sys_stack_base
 	REG_L sp, 0(a3)
+	lla a3, _KERNEL_HART_LOCAL_DATA_SIZE
+	sub sp, sp, a3
+
+	call 	k_premain
 
 	call	k_main
 
@@ -157,13 +179,9 @@ _start_hart:
 
 	.section .data
 	.align	3
-# _hart_satp:
-# 	RISCV_PTR	0
-
+	.global _sys_stack_base
 _hart_lottery:
 	RISCV_PTR	0
-# _link_start:
-# 	RISCV_PTR	_payload_start
 _boot_a0:  // hart id
 	RISCV_PTR	0
 _boot_a1: // dtb address
