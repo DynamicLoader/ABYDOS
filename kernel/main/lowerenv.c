@@ -40,8 +40,6 @@ struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1
     return ret;
 }
 
-extern int _write(int fd, char *buf, int size);
-extern _Bool k_stdout_switched;
 unsigned long k_heap_max = 0;
 // extern void *end;
 

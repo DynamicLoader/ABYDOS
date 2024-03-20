@@ -22,15 +22,7 @@ MMUBase *sysmmu = nullptr;
 // MMUBase *hartmmu[8] = {nullptr};
 
 // Only write form boot core
-enum k_stage_t
-{
-    K_BEFORE_BOOT = 0,
-    K_BOOT = 1,
-    K_BOOT_PERIP = 2,
-    K_BOOT_HARTS = 3,
-    K_MULTICORE = 4,
-    K_CLEARUP = 5
-} k_stage = K_BEFORE_BOOT;
+k_stage_t k_stage = K_BEFORE_BOOT;
 
 // std::atomic<k_stage_t> k_stage = K_BEFORE_BOOT;
 std::atomic_int k_hart_state[8] = {0};
@@ -118,8 +110,8 @@ int k_boot(void **sys_stack_base)
     // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
     // printf("We modified from mapped, now the original value is %li\n", *a);
 
-    extern char _KERNEL_BOOT_STACK_SIZE;
-    size_t boot_stack_size = (size_t)&_KERNEL_BOOT_STACK_SIZE;
+    extern char _KERNEL_TOTAL_STACK_SIZE;
+    size_t boot_stack_size = (size_t)&_KERNEL_TOTAL_STACK_SIZE;
     auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
     rc = sysmmu->map(sysmmu->getVMALowerTop() - boot_stack_size, (uintptr_t)kstack, boot_stack_size,
                      MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
@@ -208,14 +200,14 @@ int k_boot_harts(int boot_hartid)
     return 0;
 }
 
-thread_local hartLocal_t hldata;
+thread_local _reent hl_reent;
 thread_local int hartid;
 
 // to be run by each hart
 int k_premain(int hartid)
 {
 
-    _REENT_INIT_PTR(&hldata.reent)
+    _REENT_INIT_PTR(&hl_reent);
     ::hartid = hartid;
 
     // while (k_hart_state[hartid] != 2)
@@ -227,24 +219,24 @@ int k_premain(int hartid)
 
 std::atomic_flag k_console_lock = ATOMIC_FLAG_INIT;
 
-inline void k_console_lock_acquire()
-{
-    while (k_console_lock.test_and_set())
-        ;
-}
+// inline void k_console_lock_acquire()
+// {
+//     while (k_console_lock.test_and_set())
+//         ;
+// }
 
-inline void k_console_lock_release()
-{
-    k_console_lock.clear();
-}
+// inline void k_console_lock_release()
+// {
+//     k_console_lock.clear();
+// }
 
 
 int k_main(int hartid)
 {
-    // printf("Hello from hart %d!\n", hartid);
-    k_console_lock_acquire();
-    std::cout << "Hello from hart " << ::hartid << "! " << std::endl;
-    k_console_lock_release();
+    printf("Hello from hart %d!\n", hartid);
+    // k_console_lock_acquire();
+    // std::cout << "Hello from hart " << ::hartid << "! " << std::endl;
+    // k_console_lock_release();
     return 0;
 }
 
@@ -252,18 +244,18 @@ int k_after_main(int hartid, int main_ret)
 {
     if (hartid < 0) // Non boot hart
     {
-        k_console_lock_acquire();
+        // k_console_lock_acquire();
         printf("Hart %i has returned with %d\n", ::hartid, main_ret);
-        k_console_lock_release();
+        // k_console_lock_release();
         // while (k_hart_state[hl->hartid] != 3)
             k_hart_state[::hartid] = 3;
         // printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
     }
     else
     {
-        k_console_lock_acquire();
+        // k_console_lock_acquire();
         printf("\n> Waiting for other harts to return...\n");
-        k_console_lock_release();
+        // k_console_lock_release();
         int flag = 0;
         do // a timeout can be added here
         {
@@ -287,36 +279,3 @@ int k_after_main(int hartid, int main_ret)
     return main_ret; // pass to the lower
 }
 
-// Hook with libc
-extern "C" int _write(int fd, char *buf, int size)
-{
-    if (k_stdout_switched)
-        return k_stdout_func(buf, size);
-    sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf, 0, 0, 0, 0);
-    return size;
-}
-
-extern "C" struct _reent *__getreent(void)
-{
-    // _write(0, (char*)"[_] ", 4);
-    if (k_stage == K_MULTICORE)
-    {
-        return &hldata.reent;
-    }
-    return _GLOBAL_REENT;
-}
-
-std::atomic_flag k_malloc_lock = ATOMIC_FLAG_INIT;
-
-extern "C" void __malloc_lock(struct _reent *reent)
-{
-    // _write(0,(char*)"mlock\n",6);
-    while (k_malloc_lock.test_and_set())
-        ;
-}
-
-extern "C" void __malloc_unlock(struct _reent *reent)
-{
-    // _write(0,(char*)"munlock\n",8);
-    k_malloc_lock.clear();
-}

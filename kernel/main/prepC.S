@@ -56,7 +56,7 @@ _prep_boot:
 
 	/* Setup boot stack */
 	lla	a3, _kernel_end
-	lla	a4, _KERNEL_BOOT_STACK_SIZE /* this is fake a address provided from ld */
+	lla	a4, _KERNEL_TOTAL_STACK_SIZE /* this is fake a address provided from ld */
 	add a4, a4, a4 /* double the size */
 	add	sp, a3, a4
 	lla a3, _sys_stack_base
@@ -166,8 +166,10 @@ _setup_hart:
 	mul a3, a0, a2
 	sub sp, sp, a3
 
-	# lla a3, _KERNEL_HART_LOCAL_DATA_SIZE
-	# sub sp, sp, a3
+	/* Reserve Exception stack */
+	li a3, K_CONFIG_EXCEPTION_BACKUP_SIZE
+	csrw CSR_SSCRATCH, sp
+	sub sp, sp, a3
 
 _process_tdata:
 	/* Setup tdata */
