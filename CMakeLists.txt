@@ -55,9 +55,6 @@ target_compile_options(AbydOS_KNL
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
     # PUBLIC -DDEBUG
-    PUBLIC -D__DYNAMIC_REENT__
-    # PUBLIC -D_RETARGETABLE_LOCKING
-    # PUBLIC -D_KERNEL_STACK_SIZE=${KernelStackSize}
 )
 
 target_link_options(AbydOS_KNL

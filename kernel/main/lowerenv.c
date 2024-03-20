@@ -121,9 +121,9 @@ void k_clearup(int main_ret)
     printf("===== Test Kernel exited with %i =====\n", main_ret);
 }
 
-void *k_getHartLocal()
-{
-    extern uintptr_t _sys_stack_base;
-    extern char _KERNEL_HART_LOCAL_DATA_SIZE;
-    return (void *)(_sys_stack_base - (uintptr_t)&_KERNEL_HART_LOCAL_DATA_SIZE);
-}
+// void *k_getHartLocal()
+// {
+//     extern uintptr_t _sys_stack_base;
+//     extern char _KERNEL_HART_LOCAL_DATA_SIZE;
+//     return (void *)(_sys_stack_base - (uintptr_t)&_KERNEL_HART_LOCAL_DATA_SIZE);
+// }

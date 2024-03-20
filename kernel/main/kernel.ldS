@@ -16,7 +16,7 @@ _KERNEL_OFFSET = 0x200000;
 
 /* Boot stack size */
 _KERNEL_BOOT_STACK_SIZE = 0x100000;
-_KERNEL_HART_LOCAL_DATA_SIZE = 512;
+_KERNEL_HART_LOCAL_DATA_SIZE = 1024;
 
 SECTIONS
 {
@@ -101,24 +101,30 @@ SECTIONS
 		PROVIDE(_rodata_end = .);
 	}
 
-	/* . = ALIGN(0x1000);
+	. = ALIGN(0x1000);
 
-	.srodata :
+	.tdata :
 	{
-		PROVIDE(_srodata_start = .);
-    	*(.srodata.cst16)
-    	*(.srodata.cst8)
-    	*(.srodata.cst4)
-    	*(.srodata.cst2)
-    	*(.srodata .srodata.*)
+
+		PROVIDE(_tdata_start = .);
+
+		*(.tdata .tdata.*)
 		. = ALIGN(8);
-		PROVIDE(_srodata_end = .);
-	} */
+		PROVIDE(_tdata_end = .);
+	} 
 
 	/* End of the read-only data sections */
 
 	. = ALIGN(0x1000); /* Ensure next section is page aligned */
 
+	.tbss : {
+		PROVIDE(_tbss_start = .);
+		*(.tbss .tbss.*)
+		. = ALIGN(8);
+		PROVIDE(_tbss_end = .);
+	}
+
+	. = ALIGN(0x1000);
 	/* Beginning of the read-write data sections */
 
 	.data :

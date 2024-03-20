@@ -19,7 +19,7 @@ SysRoot *sysroot = nullptr;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 
-MMUBase *hartmmu[8] = {nullptr};
+// MMUBase *hartmmu[8] = {nullptr};
 
 // Only write form boot core
 enum k_stage_t
@@ -30,9 +30,9 @@ enum k_stage_t
     K_BOOT_HARTS = 3,
     K_MULTICORE = 4,
     K_CLEARUP = 5
-};
+} k_stage = K_BEFORE_BOOT;
 
-std::atomic<k_stage_t> k_stage = K_BEFORE_BOOT;
+// std::atomic<k_stage_t> k_stage = K_BEFORE_BOOT;
 std::atomic_int k_hart_state[8] = {0};
 
 int k_boot(void **sys_stack_base)
@@ -118,29 +118,6 @@ int k_boot(void **sys_stack_base)
     // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
     // printf("We modified from mapped, now the original value is %li\n", *a);
 
-    // Create mmu for each hart
-    for (int i = 0; i < 8; i++)
-    {
-        hartmmu[i] = new SV39MMU(i);
-        auto rc = hartmmu[i]->map(0, 0, 4 * 1024 * 1048576ULL,
-                                  MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X |
-                                      MMUBase::PROT_G); // Should be cloned from sysmmu, test here
-        if (rc)
-        {
-            std::cout << "[E] Failed to map lower 4G for hart " << i << ": " << rc << std::endl;
-            return K_EFAIL;
-        }
-        auto kstack = alignedMalloc<void>(K_CONFIG_STACK_SIZE, 4096);
-        rc = hartmmu[i]->map(hartmmu[i]->getVMALowerTop() - K_CONFIG_STACK_SIZE, (uintptr_t)kstack, K_CONFIG_STACK_SIZE,
-                             MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
-        if (rc)
-        {
-            std::cout << "[E] Failed to map kernel stack for hart " << i << ": " << rc << std::endl;
-            return K_EFAIL;
-        }
-        // Here we do not enable MMU for harts, as they will be enabled by themselves
-    }
-
     extern char _KERNEL_BOOT_STACK_SIZE;
     size_t boot_stack_size = (size_t)&_KERNEL_BOOT_STACK_SIZE;
     auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
@@ -189,15 +166,10 @@ int k_boot_perip()
         }
     }
 
-    // Prepare sysmmu for a global kernel stack
-    // extern char _KERNEL_BOOT_STACK_SIZE;
-    // size_t boot_stack_size = (size_t)&_KERNEL_BOOT_STACK_SIZE;
-    // sysmmu->unmap(sysmmu->getVMALowerTop() - boot_stack_size, boot_stack_size);
-
     return 0;
 }
 
-unsigned long k_boot_harts(int boot_hartid)
+int k_boot_harts(int boot_hartid)
 {
     k_stage = K_BOOT_HARTS;
     extern char _start_hart;
@@ -213,10 +185,8 @@ unsigned long k_boot_harts(int boot_hartid)
         {
             printf("Starting hart %d...", i);
             fflush(stdout);
-            unsigned long satp;
-            hartmmu[i]->getSATP(&satp);
             k_hart_state[i] = 1; // preset to 1
-            rc = SBIF::HSM::startHart(i, (uintptr_t)&_start_hart, satp);
+            rc = SBIF::HSM::startHart(i, (uintptr_t)&_start_hart, 0);
             if (rc < 0)
             {
                 std::cout << "[E] Failed to start hart " << i << ": " << SBIF::getErrorStr(rc) << std::endl;
@@ -233,20 +203,20 @@ unsigned long k_boot_harts(int boot_hartid)
         }
     }
     k_hart_state[boot_hartid] = 1;
-    unsigned long boot_satp;
-    hartmmu[boot_hartid]->getSATP(&boot_satp);
     printf("> Switching to multicore mode\n");
     k_stage = K_MULTICORE;
-    return boot_satp;
+    return 0;
 }
+
+thread_local hartLocal_t hldata;
+thread_local int hartid;
 
 // to be run by each hart
 int k_premain(int hartid)
 {
 
-    hartLocal_t *hl = (hartLocal_t *)k_getHartLocal();
-    _REENT_INIT_PTR(&hl->reent)
-    hl->hartid = hartid;
+    _REENT_INIT_PTR(&hldata.reent)
+    ::hartid = hartid;
 
     // while (k_hart_state[hartid] != 2)
         k_hart_state[hartid] = 2;
@@ -268,11 +238,12 @@ inline void k_console_lock_release()
     k_console_lock.clear();
 }
 
+
 int k_main(int hartid)
 {
     // printf("Hello from hart %d!\n", hartid);
     k_console_lock_acquire();
-    std::cout << "Hello from hart " << hartid << "!" << std::endl;
+    std::cout << "Hello from hart " << ::hartid << "! " << std::endl;
     k_console_lock_release();
     return 0;
 }
@@ -281,12 +252,11 @@ int k_after_main(int hartid, int main_ret)
 {
     if (hartid < 0) // Non boot hart
     {
-        hartLocal_t *hl = (hartLocal_t *)k_getHartLocal();
         k_console_lock_acquire();
-        printf("Hart %i has returned with %d\n", hl->hartid, main_ret);
+        printf("Hart %i has returned with %d\n", ::hartid, main_ret);
         k_console_lock_release();
         // while (k_hart_state[hl->hartid] != 3)
-            k_hart_state[hl->hartid] = 3;
+            k_hart_state[::hartid] = 3;
         // printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
     }
     else
@@ -328,10 +298,10 @@ extern "C" int _write(int fd, char *buf, int size)
 
 extern "C" struct _reent *__getreent(void)
 {
+    // _write(0, (char*)"[_] ", 4);
     if (k_stage == K_MULTICORE)
     {
-        hartLocal_t *hl = (hartLocal_t *)k_getHartLocal();
-        return &hl->reent;
+        return &hldata.reent;
     }
     return _GLOBAL_REENT;
 }

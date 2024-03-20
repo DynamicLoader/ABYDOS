@@ -8,29 +8,27 @@
 #include <stdint.h>
 #include <reent.h>
 
+#include "k_defs.h"
 
-#define K_FDT_MAX_SIZE 65536
-
-struct sbiret {
-  long error;
-  long value;
+struct sbiret
+{
+    long error;
+    long value;
 };
 
 // At most _KERNEL_HART_LOCAL_DATA_SIZE bytes
 struct hartLocal_t
 {
-    int hartid;
+    char _exceptionBackup[K_CONFIG_EXCEPTION_BACKUP_SIZE];
     struct _reent reent;
 };
 
-struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0,
-                        unsigned long arg1, unsigned long arg2,
-                        unsigned long arg3, unsigned long arg4,
-                        unsigned long arg5);
+struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
+                        unsigned long arg3, unsigned long arg4, unsigned long arg5);
 
 // extern uint8_t k_fdt[K_FDT_MAX_SIZE];
-extern void* k_fdt;
+extern void *k_fdt;
 
-void *k_getHartLocal();
+// void *k_getHartLocal();
 
 #endif

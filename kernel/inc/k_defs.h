@@ -1,13 +1,18 @@
 #ifndef __K_DEFS_H__
 #define __K_DEFS_H__
 
-#include "sbi/sbi_ecall_interface.h"
 
 // CONFIG
 
+#define K_CONFIG_EXCEPTION_BACKUP_SIZE  512
 #define K_CONFIG_STACK_SIZE 8 * 1024 // 8K
 
 // END CONFIG
+
+
+#ifndef __ASSEMBLER__
+
+#include "sbi/sbi_ecall_interface.h"
 
 // Priority of the driver and global constructors
 #define K_PR_INIT_DRV_LIST 101
@@ -39,5 +44,7 @@
 #define K_ENOMEM -1006
 #define K_EUNKNOWN -1007
 #define K_ENOENT -1008
+
+#endif // __ASSEMBLER__
 
 #endif
