@@ -12,10 +12,6 @@ ENTRY(_start)
 
 _DRAM_BASE = 0x80000000;
 _KERNEL_OFFSET = 0x200000;
-/* _DRAM_SIZE = 64 * 1024 * 1024; */
-
-/* stack size */
-_KERNEL_TOTAL_STACK_SIZE = 0x40000;
 
 SECTIONS
 {
@@ -27,17 +23,6 @@ SECTIONS
 	. = ALIGN(0x1000); /* Need this to create proper sections */
 
 	/* Beginning of the code section */
-
-	.init :
-	{
-		_sinit = .;
-		. = ALIGN(8);
-		KEEP(*(SORT_NONE(.init)))
-		. = ALIGN(8);
-		_einit = .;
-	}
-
-	. = ALIGN(0x1000);
 
 	.text :
 	{
@@ -51,7 +36,7 @@ SECTIONS
 		PROVIDE(_text_end = .);
 	}
 
-	. = ALIGN(0x1000);
+	/* . = ALIGN(0x1000); */
 
 	.init_array :
 	{
@@ -62,7 +47,7 @@ SECTIONS
 	  PROVIDE_HIDDEN (_init_array_end = .);
 	} 
 	
-	. = ALIGN(0x1000);
+	/* . = ALIGN(0x1000); */
 
 	.fini_array :
 	{
@@ -73,17 +58,18 @@ SECTIONS
 	  PROVIDE_HIDDEN (_fini_array_end = .);
 	} 
 
-	. = ALIGN(0x1000);
+	/* . = ALIGN(0x1000); */
 
 	.eh_frame :
 	{
 		PROVIDE(__eh_frame_start = .);
 		*(.eh_frame);
+		QUAD(0); /* Force terminate the eh_frame */
 	}
 
 	/* End of the code sections */
 
-	. = ALIGN(0x1000);
+	/* . = ALIGN(0x1000); */
 	/* Beginning of the read-only data sections */
 
 	.rodata :
@@ -100,31 +86,35 @@ SECTIONS
 		PROVIDE(_rodata_end = .);
 	}
 
-	. = ALIGN(0x1000);
+	/* . = ALIGN(0x1000); */
 
 	.tdata :
 	{
 
 		PROVIDE(_tdata_start = .);
 
-		*(.tdata .tdata.*)
+		*(.tdata)
+		*(.tdata.*)
 		. = ALIGN(8);
 		PROVIDE(_tdata_end = .);
 	} 
 
-	/* End of the read-only data sections */
+	/* PROVIDE(_tdata_len = SIZEOF(.tdata)); */
 
-	. = ALIGN(0x1000); /* Ensure next section is page aligned */
+	/* In TLS, do not add align 4K, otherwise addressing to tbss will need to add a 4k from $tp which cost much space */
 
 	.tbss : {
 		PROVIDE(_tbss_start = .);
-		*(.tbss .tbss.*)
+		*(.tbss)
+		*(.tbss.*)
 		. = ALIGN(8);
 		PROVIDE(_tbss_end = .);
+		
 	}
 
-	. = ALIGN(0x1000);
-	/* Beginning of the read-write data sections */
+	/* PROVIDE(_tbss_len = SIZEOF(.tbss)); */
+
+	/* . = ALIGN(0x1000); */
 
 	.data :
 	{
@@ -143,22 +133,7 @@ SECTIONS
 		PROVIDE(_data_end = .);
 	}
 
-	. = ALIGN(0x1000); /* Ensure next section is page aligned */
-
-	/* .sdata :
-	{
-		PROVIDE(_sdata_start = .);
-
-		*(.sdata)
-		*(.sdata.*)
-		*(.readmostly.sdata)
-		*(*.sdata)
-		. = ALIGN(8);
-
-		PROVIDE(_sdata_end = .);
-	}
-
-	. = ALIGN(0x1000); */
+	/* . = ALIGN(0x1000); */
 
 	.bss :
 	{
@@ -173,20 +148,7 @@ SECTIONS
 		PROVIDE(_bss_end = .);
 	}
 
-	/* End of the read-write data sections */
-
 	. = ALIGN(0x1000); /* Need this to create proper sections */
-
-	/* .sbss :
-	{
-		PROVIDE(_sbss_start = .);
-		*(.sbss)
-		*(.sbss.*)
-		. = ALIGN(8);
-		PROVIDE(_sbss_end = .);
-	}
-
-	. = ALIGN(0x1000); */
 
 	PROVIDE(_kernel_end = .);
 

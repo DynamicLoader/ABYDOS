@@ -19,12 +19,9 @@ SysRoot *sysroot = nullptr;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 
-// MMUBase *hartmmu[8] = {nullptr};
-
-// Only write form boot core
+// Only write from boot core
 k_stage_t k_stage = K_BEFORE_BOOT;
 
-// std::atomic<k_stage_t> k_stage = K_BEFORE_BOOT;
 std::atomic_int k_hart_state[8] = {0};
 
 int k_boot(void **sys_stack_base)
@@ -83,7 +80,8 @@ int k_boot(void **sys_stack_base)
     auto rc = 0;
     sysmmu = new SV39MMU(-1);
     // Lower 4G: Direct mapping
-    rc = sysmmu->map(0, 0, 4 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
+    rc =
+        sysmmu->map(0, 0, 4 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
     if (rc < 0)
     {
         std::cout << "[E] Failed to map lower 4G: " << rc << std::endl;
@@ -110,11 +108,10 @@ int k_boot(void **sys_stack_base)
     // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
     // printf("We modified from mapped, now the original value is %li\n", *a);
 
-    extern char _KERNEL_TOTAL_STACK_SIZE;
-    size_t boot_stack_size = (size_t)&_KERNEL_TOTAL_STACK_SIZE;
+    size_t boot_stack_size = K_CONFIG_KERNEL_STACK_SIZE;
     auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
     rc = sysmmu->map(sysmmu->getVMALowerTop() - boot_stack_size, (uintptr_t)kstack, boot_stack_size,
-                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X);
+                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
     if (rc < 0)
     {
         std::cout << "[E] Failed to map global kernel stack: " << rc << std::endl;
@@ -211,32 +208,19 @@ int k_premain(int hartid)
     ::hartid = hartid;
 
     // while (k_hart_state[hartid] != 2)
-        k_hart_state[hartid] = 2;
+    k_hart_state[hartid] = 2;
     while (k_stage != K_MULTICORE)
         ;          // wait for the boot core to finish
     return hartid; // keep hart id in a0
 }
 
-std::atomic_flag k_console_lock = ATOMIC_FLAG_INIT;
-
-// inline void k_console_lock_acquire()
-// {
-//     while (k_console_lock.test_and_set())
-//         ;
-// }
-
-// inline void k_console_lock_release()
-// {
-//     k_console_lock.clear();
-// }
-
+    thread_local int magic = 114514;
 
 int k_main(int hartid)
 {
-    printf("Hello from hart %d!\n", hartid);
-    // k_console_lock_acquire();
-    // std::cout << "Hello from hart " << ::hartid << "! " << std::endl;
-    // k_console_lock_release();
+
+    printf("Hello from hart %d! %i\n", hartid, magic);
+    // printf("Hello from hart %d!\n", hartid);
     return 0;
 }
 
@@ -244,18 +228,14 @@ int k_after_main(int hartid, int main_ret)
 {
     if (hartid < 0) // Non boot hart
     {
-        // k_console_lock_acquire();
+
         printf("Hart %i has returned with %d\n", ::hartid, main_ret);
-        // k_console_lock_release();
-        // while (k_hart_state[hl->hartid] != 3)
-            k_hart_state[::hartid] = 3;
+        k_hart_state[::hartid] = 3;
         // printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
     }
     else
     {
-        // k_console_lock_acquire();
         printf("\n> Waiting for other harts to return...\n");
-        // k_console_lock_release();
         int flag = 0;
         do // a timeout can be added here
         {
@@ -279,3 +259,23 @@ int k_after_main(int hartid, int main_ret)
     return main_ret; // pass to the lower
 }
 
+// class Test
+// {
+//   public:
+//     static void test() __attribute__((interrupt))
+//     {
+//         printf("Hello from Test!\n");
+//     }
+// };
+
+// __attribute__((naked)) void isr_test_entry()
+// {
+//     asm volatile("
+//         csrrw sp, sscratch, sp;           
+//         
+//     ");
+
+//     Test::test();
+
+//     asm volatile("sret");
+// }

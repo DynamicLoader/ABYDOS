@@ -56,7 +56,7 @@ _prep_boot:
 
 	/* Setup boot stack */
 	lla	a3, _kernel_end
-	lla	a4, _KERNEL_TOTAL_STACK_SIZE /* this is fake a address provided from ld */
+	li	a4, K_CONFIG_KERNEL_STACK_SIZE /* this is fake a address provided from ld */
 	add a4, a4, a4 /* double the size */
 	add	sp, a3, a4
 	lla a3, _sys_stack_base
@@ -171,11 +171,29 @@ _setup_hart:
 	csrw CSR_SSCRATCH, sp
 	sub sp, sp, a3
 
+_process_tbss:
+	/* Setup tbss */
+	lla a4, _tbss_start
+	lla a5, _tbss_end
+	beq a4, a5, _process_tdata
+
+	sub a2, a5, a4
+	sub sp, sp, a2
+	mv  tp, sp
+	mv	a3, tp
+
+	/* Zero-out tbss */
+_tbss_zero:
+	REG_S	zero, (a3)
+	add a3, a3, __SIZEOF_POINTER__
+	add	a4, a4, __SIZEOF_POINTER__
+	blt	a4, a5, _tbss_zero
+
 _process_tdata:
 	/* Setup tdata */
 	lla a3, _tdata_start
 	lla a2, _tdata_end
-	beq a3, a2, _process_tbss
+	beq a3, a2, _fini_setup_hart
 
 	sub a2, a2, a3
 	sub sp, sp, a2
@@ -190,25 +208,6 @@ _tdata_copy:
 	add a3, a3, __SIZEOF_POINTER__
 	add a5, a5, __SIZEOF_POINTER__
 	blt a3, a4, _tdata_copy
-
-_process_tbss:
-	/* Setup tbss */
-	lla a4, _tbss_start
-	lla a5, _tbss_end
-	beq a4, a5, _fini_setup_hart // leave tp unmodified as no thread local used; 
-
-	sub a2, a5, a4
-	sub sp, sp, a2
-	mv  tp, sp
-	mv	a3, tp
-
-	/* Zero-out tbss */
-_tbss_zero:
-	REG_S	zero, (a3)
-	add a3, a3, __SIZEOF_POINTER__
-	add	a4, a4, __SIZEOF_POINTER__
-	blt	a4, a5, _tbss_zero
-
 _fini_setup_hart:
 	ret
 

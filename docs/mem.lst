@@ -31,3 +31,31 @@ findfp.c:(.text.__sinit+0x6): additional relocation overflows omitted from the o
 
 
 sbrk.c:(.text._sbrk+0x14): undefined reference to `end'
+
+_start_hang () at /home/wsl/AbydOS/kernel/main/prepC.S:127
+127             j       _start_hang
+(gdb) i reg sepc
+sepc           0x8021af66       2149691238
+(gdb) x/i $sepc
+   0x8021af66 <k_premain(int)+26>:      sw      a4,344(a5)
+(gdb) i reg
+ra             0x80200132       0x80200132 <_start_hart+34>
+sp             0x3ffffffe78     0x3ffffffe78
+gp             0x0      0x0
+tp             0x3ffffffe98     0x3ffffffe98
+t0             0x8000a2ee       2147525358
+t1             0x80     128
+t2             0x0      0
+fp             0x3ffffffe98     0x3ffffffe98
+s1             0x1      1
+a0             0x0      0
+a1             0x0      0
+a2             0x1bf52  114514
+a3             0x802b4008       2150318088
+a4             0x0      0
+a5             0x4000000e98     274877910680
+a6             0x0      0
+a7             0x1      1
+s2             0x8000000000006800       -9223372036854749184
+s3             0x0      0
+s4             0x80200110       2149581072
