@@ -124,7 +124,8 @@ SECTIONS
 		*(.data.*)
 		*(.readmostly.data)
 		*(*.data)
-
+		. = ALIGN(8);
+		PROVIDE(__global_pointer$ = . + 0x800);
 		*(.sdata)
 		*(.sdata.*)
 		*(.readmostly.sdata)
@@ -138,12 +139,11 @@ SECTIONS
 	.bss :
 	{
 		PROVIDE(_bss_start = .);
-		*(.bss)
-		*(.bss.*)
-
 		*(.sbss)
 		*(.sbss.*)
 
+		*(.bss)
+		*(.bss.*)
 		. = ALIGN(8);
 		PROVIDE(_bss_end = .);
 	}
@@ -155,7 +155,6 @@ SECTIONS
 	/* Provide heap end  */
 	__heap_start__ = .;
     end = __heap_start__;
-
 
 	/* . = .+ _KERNEL_STACK_SIZE; */
 

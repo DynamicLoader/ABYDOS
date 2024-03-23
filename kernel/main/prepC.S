@@ -35,11 +35,18 @@ _start:
 	amoadd.w a3, a2, (a3)
 	bnez	a3, _start_hang // in case multi core start at the same time
 
+	.option push
+  	.option norelax
+	lla gp, __global_pointer$
+  	.option pop
+
 	/* Save a0 and a1 */
-	lla	a3, _boot_a0
-	REG_S	a0, 0(a3)
-	lla	a3, _boot_a1
-	REG_S	a1, 0(a3)
+	# lla	a3, _boot_a0
+	# REG_S	a0, 0(a3)
+	# lla	a3, _boot_a1
+	# REG_S	a1, 0(a3)
+	mv s0, a0
+	mv s1, a1
 
 	/* Zero-out BSS */
 	lla	a4, _bss_start
@@ -63,8 +70,9 @@ _prep_boot:
 	REG_S	sp, 0(a3)
 
 	/* Early boot in C */
-	lla	a3, _boot_a1
-	REG_L	a0, 0(a3)
+	# lla	a3, _boot_a1
+	# REG_L	a0, 0(a3)
+	mv a0, s1
 	call k_early_boot
 
 	bne a0, zero, _kernel_exit 
@@ -83,10 +91,7 @@ _prep_boot:
 	call k_boot_perip
 	bne a0, zero, _kernel_exit
 
-	/* recover a0 for boot hart */
-	lla	a3, _boot_a0
-	REG_L	a0, 0(a3)
-
+	mv s0, a0
 	call _setup_hart // setup boot hart first
 
 	/* Boot Stage 3: boot other harts */
@@ -94,18 +99,16 @@ _prep_boot:
 
 _start_warm:
 
-	lla	a3, _boot_a0
-	REG_L	a0, 0(a3)
-
+	mv a0, s0
 	call  	k_premain
 
+	mv 	a0, s0
 	call	k_main
 
 	/* And the last thing: after main */
 
 	mv 	a1, a0
-	lla a3, _boot_a0
-	REG_L a0, 0(a3)
+	mv 	a0, s0
 	call k_after_main
 
 _kernel_exit:
@@ -136,14 +139,23 @@ _start_hart:
 	csrw  CSR_SATP, a2
 	sfence.vma zero, zero
 
+	.option push
+  	.option norelax
+ 	lla gp, __global_pointer$
+  	.option pop
+
+	/* Save a0 and a1 in s0 and s1 */
+	mv s0, a0
+	mv s1, a1
+
 	call 	_setup_hart
 
 	call 	k_premain
 
+	mv a0, s0
 	call	k_main
 
-	add 	a1, a0, zero
-	li 		a0, -1
+	sub a0, zero, s0
 	call 	k_after_main
 
 	j _start_hang
@@ -157,7 +169,6 @@ _setup_hart:
 	/* Setup exception vectors */
 	lla	a3, _start_hang
 	csrw	CSR_STVEC, a3
-
 
 	/* Setup system stack base according to hart_id as offset */
 	lla a3, _sys_stack_base
@@ -217,10 +228,10 @@ _fini_setup_hart:
 	.global _sys_stack_base
 _hart_lottery:
 	RISCV_PTR	0
-_boot_a0:  // hart id
-	RISCV_PTR	0
-_boot_a1: // dtb address
-	RISCV_PTR	0
+# _boot_a0:  // hart id
+# 	RISCV_PTR	0
+# _boot_a1: // dtb address
+# 	RISCV_PTR	0
 _sys_stack_base:
 	RISCV_PTR	0
 _sys_satp:

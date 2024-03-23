@@ -226,12 +226,12 @@ int k_main(int hartid)
 
 int k_after_main(int hartid, int main_ret)
 {
-    if (hartid < 0) // Non boot hart
+    if (hartid < 0) // Negitive hartid for non-boot hart
     {
 
-        printf("Hart %i has returned with %d\n", ::hartid, main_ret);
+        printf("Hart %i has returned with %d\n", -hartid, main_ret);
         k_hart_state[::hartid] = 3;
-        // printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
+        printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
     }
     else
     {
@@ -259,20 +259,20 @@ int k_after_main(int hartid, int main_ret)
     return main_ret; // pass to the lower
 }
 
-// class Test
-// {
-//   public:
-//     static void test() __attribute__((interrupt))
-//     {
-//         printf("Hello from Test!\n");
-//     }
-// };
+class Test
+{
+  public:
+    static void test() __attribute__((interrupt("supervisor")))
+    {
+        printf("Hello from Test!\n");
+    }
+};
 
 // __attribute__((naked)) void isr_test_entry()
 // {
-//     asm volatile("
-//         csrrw sp, sscratch, sp;           
-//         
+//     asm volatile(" 
+//         csrrw sp, sscratch, sp;         
+        
 //     ");
 
 //     Test::test();

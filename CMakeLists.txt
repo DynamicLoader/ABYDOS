@@ -20,11 +20,11 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 # set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
-set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections -ffreestanding -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls")
-set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections  -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti")
+set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections -ffreestanding -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE")
+set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections  -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti -fPIE")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
-set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE")
 
 file(GLOB KNL_SRC 
     # kernel
@@ -59,12 +59,11 @@ target_compile_options(AbydOS_KNL
 
 target_link_options(AbydOS_KNL
     
-    PUBLIC  -Wl,--no-relax
-    # PUBLIC -Wl,--build-id=none
-    # PUBLIC -Wl,-pie -fpie
-    # PUBLIC -Wl,--no-dynamic-linker 
-    # PUBLIC -fno-pie -no-pie # overrides C_FLA
-
+    # PUBLIC  -Wl,--no-relax
+    PUBLIC -Wl,--build-id=none
+    # PUBLIC -fno-pie -no-pie
+    # PUBLIC -flinker-output=pie
+    PUBLIC -static-pie
     PUBLIC -T ${CMAKE_SOURCE_DIR}/kernel/main/kernel.ldS
 )
 
