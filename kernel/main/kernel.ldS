@@ -64,7 +64,8 @@ SECTIONS
 	{
 		PROVIDE(__eh_frame_start = .);
 		*(.eh_frame);
-		QUAD(0); /* Force terminate the eh_frame */
+		QUAD(0);QUAD(0); /* Force terminate the eh_frame */
+		. = ALIGN(8);
 	}
 
 	/* End of the code sections */
@@ -84,6 +85,16 @@ SECTIONS
     	*(.srodata .srodata.*)
 		. = ALIGN(8);
 		PROVIDE(_rodata_end = .);
+	}
+
+	.got : 
+	{
+		PROVIDE(_got_start = .);
+		*(.got)
+		*(.data.rel.ro.*)
+		/* *(.got.*)		 */
+		. = ALIGN(8);
+		PROVIDE(_got_end = .);
 	}
 
 	/* . = ALIGN(0x1000); */
@@ -123,13 +134,13 @@ SECTIONS
 		*(.data)
 		*(.data.*)
 		*(.readmostly.data)
-		*(*.data)
+		/* *(*.data) */
 		. = ALIGN(8);
 		PROVIDE(__global_pointer$ = . + 0x800);
 		*(.sdata)
-		*(.sdata.*)
+		/* *(.sdata.*) */
 		*(.readmostly.sdata)
-		*(*.sdata)
+		/* *(*.sdata) */
 		. = ALIGN(8);
 		PROVIDE(_data_end = .);
 	}

@@ -20,7 +20,7 @@ extern "C"
 
     struct _reent *__getreent(void)
     {
-        // _write(0, (char*)"[_] ", 4);
+        _write(0, (char*)"[_] ", 4);
         if (k_stage == K_MULTICORE)
             return &hl_reent;
         return _GLOBAL_REENT;

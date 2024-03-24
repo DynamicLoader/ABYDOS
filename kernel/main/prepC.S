@@ -8,6 +8,7 @@
  */
 
 #include <sbi/riscv_encoding.h>
+#include <sbi/riscv_elf.h>
 #include "k_defs.h" 
 
 #define __ASM_STR(x)	x
@@ -35,6 +36,31 @@ _start:
 	amoadd.w a3, a2, (a3)
 	bnez	a3, _start_hang // in case multi core start at the same time
 
+	/* Save load address */
+	lla	t0, _load_start
+	lla	t1, _kernel_start
+	REG_S	t1, 0(t0)
+
+_relocate:
+	/* relocate the global table content (PIE Enabeld) */
+	lla	t0, _link_start
+	REG_L	t0, 0(t0)
+	lla t1, _kernel_start
+	/* t1 shall has the address of _fw_start */
+	sub	t2, t1, t0 		// t2 is the offset
+	lla	t0, _got_start
+	lla	t1, _got_end
+	beq	t0, t1, _relocate_done
+
+2:
+	REG_L	t3, 0(t0)
+	add	t3, t3, t2
+	REG_S	t3, 0(t0)
+	addi	t0, t0, __SIZEOF_POINTER__
+	blt	t0, t1, 2b
+
+_relocate_done:
+	/* setup gp */
 	.option push
   	.option norelax
 	lla gp, __global_pointer$
@@ -232,6 +258,11 @@ _hart_lottery:
 # 	RISCV_PTR	0
 # _boot_a1: // dtb address
 # 	RISCV_PTR	0
+
+_load_start:
+	RISCV_PTR	0
+_link_start:
+	RISCV_PTR	0x80200000
 _sys_stack_base:
 	RISCV_PTR	0
 _sys_satp:

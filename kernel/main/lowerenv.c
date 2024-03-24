@@ -74,6 +74,9 @@ void *_sbrk(ptrdiff_t incr)
 // kernel init
 int k_early_boot(const void *fdt)
 {
+    // _impure_ptr = &_impure_data;
+    // _REENT_INIT_PTR(_impure_ptr);
+
     printf("\n===== Entered Test Kernel =====\n");
 
     // Copy fdt to heap

@@ -20,8 +20,8 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 # set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
-set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections -ffreestanding -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE")
-set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections  -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti -fPIE")
+set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE -fno-jump-tables ")
+set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti -fPIE -fno-jump-tables")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
 set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE")
@@ -63,7 +63,7 @@ target_link_options(AbydOS_KNL
     PUBLIC -Wl,--build-id=none
     # PUBLIC -fno-pie -no-pie
     # PUBLIC -flinker-output=pie
-    PUBLIC -static-pie
+    PUBLIC -fpie -static-pie -static 
     PUBLIC -T ${CMAKE_SOURCE_DIR}/kernel/main/kernel.ldS
 )
 
