@@ -71,4 +71,30 @@
         __asm__ __volatile__("sfence.vma x0,x0" ::: "memory");                                                         \
     } while (0)
 
+#define sfence_vma_asid(asid)                                                                                          \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        __asm__ __volatile__("sfence.vma zero, %0" ::"r"(asid) : "memory");                                            \
+    } while (0)
+
+#define sfence_vma_addr(addr)                                                                                          \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        __asm__ __volatile__("sfence.vma %0, zero" ::"r"(addr) : "memory");                                            \
+    } while (0)
+
+#define sfence_vma_range(addr, asid)                                                                                   \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        __asm__ __volatile__("sfence.vma %0, %1" ::"r"(addr), "r"(asid) : "memory");                                   \
+    } while (0)
+
+#define set_stvec(base, mode)                                                                                          \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        csr_write(stvec, base);                                                                                        \
+        if (mode)                                                                                                      \
+            csr_set(stvec, 1);                                                                                          \
+    } while (0)
+
 #endif

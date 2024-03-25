@@ -16,13 +16,6 @@ struct sbiret
     long value;
 };
 
-// At most _KERNEL_HART_LOCAL_DATA_SIZE bytes
-struct hartLocal_t
-{
-    char _exceptionBackup[K_CONFIG_EXCEPTION_BACKUP_SIZE];
-    struct _reent reent;
-};
-
 struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
                         unsigned long arg3, unsigned long arg4, unsigned long arg5);
 

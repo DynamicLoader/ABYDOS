@@ -9,8 +9,8 @@ set(CMAKE_SYSTEM_PROCESSOR rv64)
 
 set(Toolchain_Prefix riscv64-unknown-elf-)
 
-set(PL_ABI lp64d)
-set(PL_ISA rv64imafdc)
+set(PL_ABI lp64)
+set(PL_ISA rv64imac_zicsr)
 set(PL_MDL medany)
 
 # get rid of '-rdynamic'
@@ -20,11 +20,11 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 # set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
-set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections -ffreestanding -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE")
-set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -ffunction-sections -fdata-sections  -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti -fPIE")
+set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
-set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls -fPIE")
+set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 
 file(GLOB KNL_SRC 
     # kernel
@@ -61,9 +61,8 @@ target_link_options(AbydOS_KNL
     
     # PUBLIC  -Wl,--no-relax
     PUBLIC -Wl,--build-id=none
-    # PUBLIC -fno-pie -no-pie
-    # PUBLIC -flinker-output=pie
-    PUBLIC -static-pie
+    PUBLIC -fno-pie -no-pie
+    PUBLIC -static
     PUBLIC -T ${CMAKE_SOURCE_DIR}/kernel/main/kernel.ldS
 )
 

@@ -4,8 +4,9 @@
 
 // CONFIG
 
-#define K_CONFIG_EXCEPTION_BACKUP_SIZE  512
-#define K_CONFIG_STACK_SIZE 8 * 1024 // 8K
+// #define K_CONFIG_EXCEPTION_BACKUP_SIZE  512
+#define K_CONFIG_STACK_SIZE_N 13
+#define K_CONFIG_STACK_SIZE (1 << K_CONFIG_STACK_SIZE_N) // 8K, must be 2^n bytes
 #define K_CONFIG_KERNEL_STACK_SIZE  64 * K_CONFIG_STACK_SIZE
 
 // END CONFIG
@@ -14,6 +15,14 @@
 #ifndef __ASSEMBLER__
 
 #include "sbi/sbi_ecall_interface.h"
+
+
+#ifdef __cplusplus
+#define K_ISR extern "C"
+#else
+#define K_ISR 
+#endif
+#define K_ISR_ENTRY K_ISR __attribute__((naked)) 
 
 // Priority of the driver and global constructors
 #define K_PR_INIT_DRV_LIST 101

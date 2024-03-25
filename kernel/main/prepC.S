@@ -131,6 +131,50 @@ _start_hang:
 
 	.section .entry, "ax", %progbits
 	.align 3
+	.globl _exctable
+_exctable:
+	// 0x0 General exception
+	j _start_hang
+	.align 2
+	// 0x1 Suprvior software interrupt
+	j k_softirq_entry
+	.align 2
+	// 2 - 4 Reserved
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	// 0x5 Supervisor timer interrupt
+	j k_timer_entry
+	.align 2
+	// 0x6 Supervisor external interrupt
+	j k_extirq_entry
+	.align 2
+	// 0x7 - 0x1F Reserved
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	j _start_hang
+	.align 2
+	// End of exception table
+
+	.section .entry, "ax", %progbits
+	.align 3
 	.globl _start_hart
 _start_hart:
 	/* a0: hartid a1: reserved */
@@ -177,11 +221,6 @@ _setup_hart:
 	mul a3, a0, a2
 	sub sp, sp, a3
 
-	/* Reserve Exception stack */
-	li a3, K_CONFIG_EXCEPTION_BACKUP_SIZE
-	csrw CSR_SSCRATCH, sp
-	sub sp, sp, a3
-
 _process_tbss:
 	/* Setup tbss */
 	lla a4, _tbss_start
@@ -220,8 +259,9 @@ _tdata_copy:
 	add a5, a5, __SIZEOF_POINTER__
 	blt a3, a4, _tdata_copy
 _fini_setup_hart:
+	// set ssratch to zero, so that we know the interrupt is from S-mode
+	csrw CSR_SSCRATCH, zero
 	ret
-
 
 	.section .data
 	.align	3

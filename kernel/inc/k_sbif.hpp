@@ -100,6 +100,7 @@ class SBIF
     class Timer : public impl_helper<SBI_EXT_TIME>
     {
       public:
+        // @todo This may need to be fixed for rv32 since it requires u64
         static auto setTimer(unsigned long sv)
         {
             return CSBI(SBI_EXT_TIME_SET_TIMER, sv).error;
@@ -107,7 +108,7 @@ class SBIF
 
         static auto clearTimer()
         {
-            return CSBI(SBI_EXT_TIME_SET_TIMER, (0xFFFFFFFFFFFFFFFF) - 1).error;
+            return CSBI(SBI_EXT_TIME_SET_TIMER, ((uint64_t)-1) >> 8).error;
         }
     };
 

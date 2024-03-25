@@ -11,7 +11,7 @@ OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
 _DRAM_BASE = 0x80000000;
-_KERNEL_OFFSET = 0x200000;
+_KERNEL_OFFSET = 0x100000;
 
 SECTIONS
 {
@@ -112,7 +112,7 @@ SECTIONS
 		
 	}
 
-	/* PROVIDE(_tbss_len = SIZEOF(.tbss)); */
+	PROVIDE(_tls_len = (_tbss_end - _tbss_start) + (_tdata_end - _tdata_start));
 
 	/* . = ALIGN(0x1000); */
 

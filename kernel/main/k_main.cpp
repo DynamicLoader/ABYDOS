@@ -182,7 +182,7 @@ int k_boot_harts(int boot_hartid)
                 k_hart_state[i] = 0; // reset to 0
                 continue;
             }
-            while (k_hart_state[i] != 2)
+            while (k_hart_state[i] < 2)
                 ; // timeout here!
             printf("OK!\n");
         }
@@ -207,25 +207,41 @@ int k_premain(int hartid)
     _REENT_INIT_PTR(&hl_reent);
     ::hartid = hartid;
 
-    // while (k_hart_state[hartid] != 2)
+    // Setup Hart Timer
+    auto rc = SBIF::Timer::setTimer(hartid * 10000000);
+    if (rc)
+    {
+        printf("Failed to set timer: %ld\n", rc);
+        k_hart_state[hartid] = 3; // mark as failed
+        SBIF::HSM::stopHart();
+        while (1)
+            wfi();
+    }
+    extern char _exctable;
+    set_stvec((unsigned long)&_exctable, 1);
+    csr_set(CSR_SIE, SIP_STIP | SIP_SSIP);
+
     k_hart_state[hartid] = 2;
     while (k_stage != K_MULTICORE)
         ;          // wait for the boot core to finish
+    csr_set(CSR_SSTATUS, SSTATUS_SIE);
     return hartid; // keep hart id in a0
 }
 
-    thread_local int magic = 114514;
+thread_local int magic = 114514;
 
 int k_main(int hartid)
 {
 
     printf("Hello from hart %d! %i\n", hartid, magic);
-    // printf("Hello from hart %d!\n", hartid);
+    while(1);
+        // printf("Hart %d is running!\n", hartid);
     return 0;
 }
 
 int k_after_main(int hartid, int main_ret)
 {
+    csr_clear(CSR_SIE, (uint64_t)-1);
     if (hartid < 0) // Negitive hartid for non-boot hart
     {
 
@@ -270,9 +286,9 @@ class Test
 
 // __attribute__((naked)) void isr_test_entry()
 // {
-//     asm volatile(" 
-//         csrrw sp, sscratch, sp;         
-        
+//     asm volatile("
+//         csrrw sp, sscratch, sp;
+
 //     ");
 
 //     Test::test();
