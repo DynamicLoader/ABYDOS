@@ -23,7 +23,7 @@ Then use CMake to configure and build. If everything goes well, you should get t
 
 **About the Toolchain**:
 
-The package from Ubuntu/Debian does not contain newlib or libstdc++. Therefore, it is required to use a full toolchain that supports them. Toolchains from [riscv-collab](https://github.com/riscv-collab/riscv-gnu-toolchain) are compiled with -mcmodel=medlow by default, which is not compatible with 0x80000000 as the kernel base. I have forked and compiled it with -mcmodel=medany [here](https://github.com/DynamicLoader/riscv-gnu-toolchain). If you need it, you can go to the actions for downloading.
+The package from Ubuntu/Debian does not contain newlib or libstdc++. Therefore, it is required to use a full toolchain that supports them. Toolchains from [riscv-collab](https://github.com/riscv-collab/riscv-gnu-toolchain) are compiled with -mcmodel=medlow by default, which is not compatible with 0x80000000 as the kernel base. I have forked and compiled it with -mcmodel=medany (also other options to get the kernel work) [here](https://github.com/DynamicLoader/riscv-gnu-toolchain). Just go to the [Actions] for downloading.
 
 **Notes on configuring CMake:**
 
@@ -50,6 +50,8 @@ It's not necessary to build OpenSBI for a full installation of QEMU (-bios=defau
 ```bash
 qemu-system-riscv64 -M virt -m 256M -nographic -bios build/platform/generic/firmware/fw_jump.elf -kernel ../build/AbydOS_KNL
 ```
+
+Multi-hart is supported, so `-smp 8` can be added to test. 
 
 If you'd like to connect a FLASH, just generate a flash file with exact size of 32MB, then add the arguement below:
 

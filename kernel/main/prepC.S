@@ -91,7 +91,7 @@ _prep_boot:
 	call k_boot_perip
 	bne a0, zero, _kernel_exit
 
-	mv s0, a0
+	mv a0, s0
 	call _setup_hart // setup boot hart first
 
 	/* Boot Stage 3: boot other harts */
@@ -199,7 +199,9 @@ _start_hart:
 	mv a0, s0
 	call	k_main
 
-	sub a0, zero, s0
+	# sub a0, zero, s0
+	mv a1, a0
+	li a0, -1
 	call 	k_after_main
 
 	j _start_hang

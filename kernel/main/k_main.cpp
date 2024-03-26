@@ -228,13 +228,14 @@ int k_premain(int hartid)
     return hartid; // keep hart id in a0
 }
 
-thread_local int magic = 114514;
+thread_local bool k_halt = false;
 
 int k_main(int hartid)
 {
 
-    printf("Hello from hart %d! %i\n", hartid, magic);
-    while(1);
+    printf("Hello from hart %d!\n", hartid);
+    while(!k_halt);
+
         // printf("Hart %d is running!\n", hartid);
     return 0;
 }
@@ -245,7 +246,7 @@ int k_after_main(int hartid, int main_ret)
     if (hartid < 0) // Negitive hartid for non-boot hart
     {
 
-        printf("Hart %i has returned with %d\n", -hartid, main_ret);
+        printf("Hart %i has returned with %d\n", ::hartid, main_ret);
         k_hart_state[::hartid] = 3;
         printf("Failed to stop hart: %ld\n", SBIF::HSM::stopHart());
     }
@@ -275,23 +276,3 @@ int k_after_main(int hartid, int main_ret)
     return main_ret; // pass to the lower
 }
 
-class Test
-{
-  public:
-    static void test() __attribute__((interrupt("supervisor")))
-    {
-        printf("Hello from Test!\n");
-    }
-};
-
-// __attribute__((naked)) void isr_test_entry()
-// {
-//     asm volatile("
-//         csrrw sp, sscratch, sp;
-
-//     ");
-
-//     Test::test();
-
-//     asm volatile("sret");
-// }

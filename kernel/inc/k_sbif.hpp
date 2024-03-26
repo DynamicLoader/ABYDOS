@@ -18,7 +18,7 @@ using sbiret_t = struct sbiret;
 class SBIF
 {
   private:
-    static sbiret_t callSBI(int ext, int fid, unsigned long arg0 = 0, unsigned long arg1 = 0, unsigned long arg2 = 0,
+    __always_inline static sbiret_t callSBI(int ext, int fid, unsigned long arg0 = 0, unsigned long arg1 = 0, unsigned long arg2 = 0,
                             unsigned long arg3 = 0, unsigned long arg4 = 0, unsigned long arg5 = 0)
     {
         return sbi_ecall(ext, fid, arg0, arg1, arg2, arg3, arg4, arg5);
@@ -27,7 +27,7 @@ class SBIF
     template <unsigned long EXTID> class impl_helper
     {
       protected:
-        static sbiret_t CSBI(int fid, unsigned long arg0 = 0, unsigned long arg1 = 0, unsigned long arg2 = 0,
+        __always_inline static sbiret_t CSBI(int fid, unsigned long arg0 = 0, unsigned long arg1 = 0, unsigned long arg2 = 0,
                              unsigned long arg3 = 0, unsigned long arg4 = 0, unsigned long arg5 = 0)
         {
             return sbi_ecall(EXTID, fid, arg0, arg1, arg2, arg3, arg4, arg5);
@@ -116,9 +116,9 @@ class SBIF
     {
       public:
         // Always Success
-        static void sendIPI(unsigned long hart_mask, unsigned long event)
+        static void sendIPI(unsigned long hart_mask, unsigned long hartid_base)
         {
-            CSBI(SBI_EXT_IPI_SEND_IPI, hart_mask, event);
+            CSBI(SBI_EXT_IPI_SEND_IPI, hart_mask, hartid_base);
         }
     };
 

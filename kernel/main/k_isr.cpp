@@ -122,7 +122,10 @@
 
 K_ISR void isr_softirq()
 {
-    printf("Softirq interrupt for hart %i\n",hartid);
+    printf("Software interrupt for hart %i\n",hartid);
+    extern thread_local bool k_halt;
+    k_halt = true;
+    csr_clear(CSR_SIP, SIP_SSIP);
 }
 
 K_ISR void isr_timer()
@@ -130,6 +133,11 @@ K_ISR void isr_timer()
     auto time = csr_read(CSR_TIME);
     printf("Timer interrupt for hart %i\n",hartid);
     printf("Current Time: %ld\n", time);
+    if(time > 10 * 10000000){
+        SBIF::IPI::sendIPI(-1, 0);
+        SBIF::Timer::clearTimer();
+        return;
+    }
     auto rc = SBIF::Timer::setTimer(time + 10000000);
     if(rc)
         printf("Cannot reset timer: %ld\n", rc);
