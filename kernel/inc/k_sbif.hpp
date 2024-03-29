@@ -4,12 +4,12 @@
 extern "C"
 {
 #include "llenv.h"
-// #include "riscv_asm.h"
-// #include "sbi/riscv_encoding.h"
+    // #include "riscv_asm.h"
+    // #include "sbi/riscv_encoding.h"
 
 #include <cstring>
 
-// #undef OPENSBI_EXTERNAL_SBI_TYPES
+    // #undef OPENSBI_EXTERNAL_SBI_TYPES
 
 } // extern "C"
 
@@ -18,17 +18,25 @@ using sbiret_t = struct sbiret;
 class SBIF
 {
   private:
-    __always_inline static sbiret_t callSBI(int ext, int fid, unsigned long arg0 = 0, unsigned long arg1 = 0, unsigned long arg2 = 0,
-                            unsigned long arg3 = 0, unsigned long arg4 = 0, unsigned long arg5 = 0)
+    __always_inline static sbiret_t callSBI(int ext, int fid, unsigned long arg0 = 0, unsigned long arg1 = 0,
+                                            unsigned long arg2 = 0, unsigned long arg3 = 0, unsigned long arg4 = 0,
+                                            unsigned long arg5 = 0)
     {
         return sbi_ecall(ext, fid, arg0, arg1, arg2, arg3, arg4, arg5);
     }
 
     template <unsigned long EXTID> class impl_helper
     {
+      public:
+        static auto available()
+        {
+            return sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_PROBE_EXT, EXTID, 0, 0, 0, 0, 0).value;
+        }
+
       protected:
-        __always_inline static sbiret_t CSBI(int fid, unsigned long arg0 = 0, unsigned long arg1 = 0, unsigned long arg2 = 0,
-                             unsigned long arg3 = 0, unsigned long arg4 = 0, unsigned long arg5 = 0)
+        __always_inline static sbiret_t CSBI(int fid, unsigned long arg0 = 0, unsigned long arg1 = 0,
+                                             unsigned long arg2 = 0, unsigned long arg3 = 0, unsigned long arg4 = 0,
+                                             unsigned long arg5 = 0)
         {
             return sbi_ecall(EXTID, fid, arg0, arg1, arg2, arg3, arg4, arg5);
         }
@@ -82,7 +90,7 @@ class SBIF
         }
     };
 
-    class DebugCon : public impl_helper<SBI_EXT_DBCN>
+    class DBCN : public impl_helper<SBI_EXT_DBCN>
     {
       public:
         static auto puts(const char *str)
@@ -166,6 +174,29 @@ class SBIF
         {
             return CSBI(SBI_EXT_SRST_RESET, reset_type, reason).error;
         }
+    };
+
+    class RFNC : public impl_helper<SBI_EXT_RFENCE>
+    {
+      public:
+        static auto fenceI(unsigned long hart_mask, unsigned long hartid_base)
+        {
+            return CSBI(SBI_EXT_RFENCE_REMOTE_FENCE_I, hart_mask, hartid_base).error;
+        }
+
+        static auto sfenceVMA(unsigned long hart_mask, unsigned long hartid_base, unsigned long start_addr,
+                             unsigned long size)
+        {
+            return CSBI(SBI_EXT_RFENCE_REMOTE_SFENCE_VMA, hart_mask, hartid_base, start_addr, size).error;
+        }
+
+        static auto sfenceVMA(unsigned long hart_mask, unsigned long hartid_base, unsigned long start_addr,
+                             unsigned long size, unsigned long asid)
+        {
+            return CSBI(SBI_EXT_RFENCE_REMOTE_SFENCE_VMA_ASID, hart_mask, hartid_base, start_addr, size, asid).error;
+        }
+
+        // Hypervisor related not implemented
     };
 
     static const char *getErrorStr(long err)

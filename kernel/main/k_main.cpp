@@ -10,7 +10,7 @@
 #include "k_sysdev.h"
 #include "k_mmu.h"
 
-SBIF::DebugCon dbg;
+SBIF::DBCN dbg;
 
 std::function<int(const char *, int size)> k_stdout_func;
 bool k_stdout_switched = false;
@@ -31,6 +31,31 @@ int k_boot(void **sys_stack_base)
     std::cout << "Dumping Device tree..." << std::endl;
     fdt_print_node(k_fdt, 0, 0);
 #endif
+
+    // Probe SBI extensions
+    std::cout << "> Listing SBI and Machine info" << std::endl;
+    std::cout << "Machine Vendor ID : " << SBIF::Base::getVID() << std::endl;
+    std::cout << "Machine Arch ID   : " << SBIF::Base::getAID() << std::endl;
+    std::cout << "Machine Impl ID   : " << SBIF::Base::getMacImplID() << std::endl;
+    auto sbispecv = SBIF::Base::getSpecVersion();
+    std::cout << "SBI Spec Version  : " << ((sbispecv & 0x7F000000) >> 24) << "." << (sbispecv & 0xFFFFFF) << std::endl;
+    auto sbiimpl = SBIF::Base::getImplID();
+    std::cout << "SBI Impl ID       : " << sbiimpl << "(" << SBIF::Base::getImplName(sbiimpl) << ")" << std::endl;
+    std::cout << "SBI Impl Version  : " << SBIF::Base::getImplVer() << std::endl;
+    std::cout << "SBI Extensions    : [ ";
+    if (SBIF::Timer::available())
+        std::cout << " TIME ";
+    if (SBIF::IPI::available())
+        std::cout << " IPI ";
+    if (SBIF::HSM::available())
+        std::cout << " HSM ";
+    if (SBIF::DBCN::available())
+        std::cout << " DBCN ";
+    if (SBIF::SRST::available())
+        std::cout << " SRST ";
+    if (SBIF::RFNC::available())
+        std::cout << " RFNC ";
+    std::cout << " ]" << std::endl;
 
     std::cout << "> Probing system devices" << std::endl;
     DriverManager::probe(k_fdt, DEV_TYPE_SYS);
@@ -223,7 +248,7 @@ int k_premain(int hartid)
 
     k_hart_state[hartid] = 2;
     while (k_stage != K_MULTICORE)
-        ;          // wait for the boot core to finish
+        ; // wait for the boot core to finish
     csr_set(CSR_SSTATUS, SSTATUS_SIE);
     return hartid; // keep hart id in a0
 }
@@ -234,15 +259,16 @@ int k_main(int hartid)
 {
 
     printf("Hello from hart %d!\n", hartid);
-    while(!k_halt);
+    while (!k_halt)
+        ;
 
-        // printf("Hart %d is running!\n", hartid);
+    // printf("Hart %d is running!\n", hartid);
     return 0;
 }
 
 int k_after_main(int hartid, int main_ret)
 {
-    ebreak();
+    // ebreak();
     csr_clear(CSR_SIE, (uint64_t)-1);
     if (hartid < 0) // Negitive hartid for non-boot hart
     {
@@ -276,4 +302,3 @@ int k_after_main(int hartid, int main_ret)
     }
     return main_ret; // pass to the lower
 }
-

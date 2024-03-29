@@ -235,6 +235,7 @@ K_ISR_ENTRY void k_exception_entry(){
     );
     // Here we construct a jump table
     asm volatile(
+        ".align 4 \n"
         "1: \n"
         _K_EXC_NO_HANDLER() // 0
         _K_EXC_NO_HANDLER() // 1
@@ -264,7 +265,6 @@ K_ISR_ENTRY void k_exception_entry(){
         REG_L " tp, -" _VSTR((SAVE_SPACE - 2) * REG_SIZE) "(sp) \n" 
     );
     K_ISR_SWITCH_SP();
-
     asm volatile("j _start_hang \n");
 
     // Internal function to save context
