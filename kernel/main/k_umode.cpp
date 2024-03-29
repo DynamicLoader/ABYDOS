@@ -60,39 +60,45 @@ template <uint8_t flen> struct umode_float_ctx_t
     uint32_t f[32 * (flen >> 5)];
     uint32_t fcsr;
 
+#define _f_save(ext, len)                                                                                              \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        _umode_ext_enable(#ext);                                                                                       \
+        asm volatile(_umode_ls_ops("fs" #len, "f") : _umode_ls_cons_arr("=m", f, 0, 0) : _umode_ls_cons_i("i", 0));    \
+        asm volatile(_umode_ls_ops("fs" #len, "f") : _umode_ls_cons_arr("=m", f, 0, 8) : _umode_ls_cons_i("i", 8));    \
+        asm volatile(_umode_ls_ops("fs" #len, "f") : _umode_ls_cons_arr("=m", f, 0, 16) : _umode_ls_cons_i("i", 16));  \
+        asm volatile(_umode_ls_ops("fs" #len, "f") : _umode_ls_cons_arr("=m", f, 0, 24) : _umode_ls_cons_i("i", 24));  \
+        fcsr = csr_read(CSR_FCSR);                                                                                     \
+        _umode_ext_disable();                                                                                          \
+    } while (0)
+
+#define _f_load(ext, len)                                                                                              \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        _umode_ext_enable(#ext);                                                                                       \
+        asm volatile(_umode_ls_ops("fl" #len, "f") : : _umode_ls_cons_arr("m", f, 0, 0), _umode_ls_cons_i("i", 0));    \
+        asm volatile(_umode_ls_ops("fl" #len, "f") : : _umode_ls_cons_arr("m", f, 0, 8), _umode_ls_cons_i("i", 8));    \
+        asm volatile(_umode_ls_ops("fl" #len, "f") : : _umode_ls_cons_arr("m", f, 0, 16), _umode_ls_cons_i("i", 16));  \
+        asm volatile(_umode_ls_ops("fl" #len, "f") : : _umode_ls_cons_arr("m", f, 0, 24), _umode_ls_cons_i("i", 24));  \
+        csr_write(CSR_FCSR, fcsr);                                                                                     \
+        _umode_ext_disable();                                                                                          \
+    } while (0)
+
     // must be executed after main context is saved
     void save()
     {
 
         if constexpr (flen == 32)
         {
-            _umode_ext_enable("f");
-            asm volatile(_umode_ls_ops("fsw", "f") : _umode_ls_cons_arr("=m", f, 0, 0) : _umode_ls_cons_i("i", 0));
-            asm volatile(_umode_ls_ops("fsw", "f") : _umode_ls_cons_arr("=m", f, 0, 8) : _umode_ls_cons_i("i", 8));
-            asm volatile(_umode_ls_ops("fsw", "f") : _umode_ls_cons_arr("=m", f, 0, 16) : _umode_ls_cons_i("i", 16));
-            asm volatile(_umode_ls_ops("fsw", "f") : _umode_ls_cons_arr("=m", f, 0, 24) : _umode_ls_cons_i("i", 24));
-            fcsr = csr_read(CSR_FCSR);
-            _umode_ext_disable();
+            _f_save(f, w);
         }
         else if constexpr (flen == 64)
         {
-            _umode_ext_enable("d");
-            asm volatile(_umode_ls_ops("fsd", "f") : _umode_ls_cons_arr("=m", f, 0, 0) : _umode_ls_cons_i("i", 0));
-            asm volatile(_umode_ls_ops("fsd", "f") : _umode_ls_cons_arr("=m", f, 0, 8) : _umode_ls_cons_i("i", 8));
-            asm volatile(_umode_ls_ops("fsd", "f") : _umode_ls_cons_arr("=m", f, 0, 16) : _umode_ls_cons_i("i", 16));
-            asm volatile(_umode_ls_ops("fsd", "f") : _umode_ls_cons_arr("=m", f, 0, 24) : _umode_ls_cons_i("i", 24));
-            fcsr = csr_read(CSR_FCSR);
-            _umode_ext_disable();
+            _f_save(d, d);
         }
         else if constexpr (flen == 128)
         {
-            _umode_ext_enable("q");
-            asm volatile(_umode_ls_ops("fsq", "f") : _umode_ls_cons_arr("=m", f, 0, 0) : _umode_ls_cons_i("i", 0));
-            asm volatile(_umode_ls_ops("fsq", "f") : _umode_ls_cons_arr("=m", f, 0, 8) : _umode_ls_cons_i("i", 8));
-            asm volatile(_umode_ls_ops("fsq", "f") : _umode_ls_cons_arr("=m", f, 0, 16) : _umode_ls_cons_i("i", 16));
-            asm volatile(_umode_ls_ops("fsq", "f") : _umode_ls_cons_arr("=m", f, 0, 24) : _umode_ls_cons_i("i", 24));
-            fcsr = csr_read(CSR_FCSR);
-            _umode_ext_disable();
+            _f_save(q, q);
         }
         else
         {
@@ -105,33 +111,15 @@ template <uint8_t flen> struct umode_float_ctx_t
     {
         if constexpr (flen == 32)
         {
-            _umode_ext_enable("f");
-            asm volatile(_umode_ls_ops("flw", "f") : : _umode_ls_cons_arr("m", f, 0, 0), _umode_ls_cons_i("i", 0));
-            asm volatile(_umode_ls_ops("flw", "f") : : _umode_ls_cons_arr("m", f, 0, 8), _umode_ls_cons_i("i", 8));
-            asm volatile(_umode_ls_ops("flw", "f") : : _umode_ls_cons_arr("m", f, 0, 16), _umode_ls_cons_i("i", 16));
-            asm volatile(_umode_ls_ops("flw", "f") : : _umode_ls_cons_arr("m", f, 0, 24), _umode_ls_cons_i("i", 24));
-            csr_write(CSR_FCSR, fcsr);
-            _umode_ext_disable();
+            _f_load(f, w);
         }
         else if constexpr (flen == 64)
         {
-            _umode_ext_enable("d");
-            asm volatile(_umode_ls_ops("fld", "f") : : _umode_ls_cons_arr("m", f, 0, 0), _umode_ls_cons_i("i", 0));
-            asm volatile(_umode_ls_ops("fld", "f") : : _umode_ls_cons_arr("m", f, 0, 8), _umode_ls_cons_i("i", 8));
-            asm volatile(_umode_ls_ops("fld", "f") : : _umode_ls_cons_arr("m", f, 0, 16), _umode_ls_cons_i("i", 16));
-            asm volatile(_umode_ls_ops("fld", "f") : : _umode_ls_cons_arr("m", f, 0, 24), _umode_ls_cons_i("i", 24));
-            csr_write(CSR_FCSR, fcsr);
-            _umode_ext_disable();
+            _f_load(d, d);
         }
         else if constexpr (flen == 128)
         {
-            _umode_ext_enable("q");
-            asm volatile(_umode_ls_ops("flq", "f") : : _umode_ls_cons_arr("m", f, 0, 0), _umode_ls_cons_i("i", 0));
-            asm volatile(_umode_ls_ops("flq", "f") : : _umode_ls_cons_arr("m", f, 0, 8), _umode_ls_cons_i("i", 8));
-            asm volatile(_umode_ls_ops("flq", "f") : : _umode_ls_cons_arr("m", f, 0, 16), _umode_ls_cons_i("i", 16));
-            asm volatile(_umode_ls_ops("flq", "f") : : _umode_ls_cons_arr("m", f, 0, 24), _umode_ls_cons_i("i", 24));
-            csr_write(CSR_FCSR, fcsr);
-            _umode_ext_disable();
+            _f_load(q, q);
         }
         else
         {
