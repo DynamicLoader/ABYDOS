@@ -253,7 +253,7 @@ int k_premain(int hartid)
     return hartid; // keep hart id in a0
 }
 
-thread_local bool k_halt = false;
+thread_local bool volatile k_halt = false;
 
 int k_main(int hartid)
 {
