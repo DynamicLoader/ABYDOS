@@ -22,7 +22,7 @@
 #else
 #define K_ISR 
 #endif
-#define K_ISR_ENTRY K_ISR __attribute__((naked)) 
+#define K_ISR_ENTRY extern "C" __attribute__((naked)) 
 
 // Priority of the driver and global constructors
 #define K_PR_INIT_DRV_LIST 101

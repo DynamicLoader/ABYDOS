@@ -134,7 +134,7 @@ _start_hang:
 	.globl _exctable
 _exctable:
 	// 0x0 General exception
-	j _start_hang
+	j k_exception_entry
 	.align 2
 	// 0x1 Suprvior software interrupt
 	j k_softirq_entry

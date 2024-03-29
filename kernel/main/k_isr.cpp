@@ -39,12 +39,7 @@
         "1: \n" \
     )
 
-#define K_ISR_SAVE_CONTEXT() \
-    asm volatile( \
-        "add sp, sp, -" _VSTR(SAVE_SPACE * REG_SIZE) " \n" \
-        REG_S " ra, " _VSTR(0 * REG_SIZE) "(sp) \n" \
-        REG_S " gp, " _VSTR(1 * REG_SIZE) "(sp) \n" \
-        REG_S " tp, " _VSTR(2 * REG_SIZE) "(sp) \n" \
+#define _K_ISR_SAVE_CONTEXT_NORMAL \
         REG_S " t0, " _VSTR(3 * REG_SIZE) "(sp) \n" \
         REG_S " t1, " _VSTR(4 * REG_SIZE) "(sp) \n" \
         REG_S " t2, " _VSTR(5 * REG_SIZE) "(sp) \n" \
@@ -60,6 +55,8 @@
         REG_S " a5, " _VSTR(15 * REG_SIZE) "(sp) \n" \
         REG_S " a6, " _VSTR(16 * REG_SIZE) "(sp) \n" \
         REG_S " a7, " _VSTR(17 * REG_SIZE) "(sp) \n" \
+    
+#define _K_ISR_SAVE_RECALC_PTRS \
         "mv tp, sp \n" \
         "li gp, " _VSTR(K_CONFIG_KERNEL_STACK_SIZE - 1) "\n" \
         "and gp, gp, sp \n" \
@@ -74,6 +71,15 @@
         ".option norelax \n" \
         "lla gp, __global_pointer$ \n" \
         ".option pop \n" \
+
+#define K_ISR_SAVE_CONTEXT() \
+    asm volatile( \
+        "add sp, sp, -" _VSTR(SAVE_SPACE * REG_SIZE) " \n" \
+        REG_S " ra, " _VSTR(0 * REG_SIZE) "(sp) \n" \
+        REG_S " gp, " _VSTR(1 * REG_SIZE) "(sp) \n" \
+        REG_S " tp, " _VSTR(2 * REG_SIZE) "(sp) \n" \
+        _K_ISR_SAVE_CONTEXT_NORMAL \
+        _K_ISR_SAVE_RECALC_PTRS \
     )
 
 #define K_ISR_RESTORE_CONTEXT(ret) \
@@ -101,13 +107,27 @@
 
 // clang-format on
 
-/* #define K_ISR_SAVE_AND_CALL(func) \ \
-    K_ISR_SAVE_CONTEXT();                                                                                              \
-    asm volatile("call " #func);
-
-#define K_ISR_RESTORE_AND_RET(ret)                                                                                     \
-    K_ISR_RESTORE_CONTEXT();                                                                                           \
-    asm volatile(#ret "\n"); */
+struct saved_context_t
+{
+    unsigned long ra;
+    unsigned long gp;
+    unsigned long tp;
+    unsigned long t0;
+    unsigned long t1;
+    unsigned long t2;
+    unsigned long t3;
+    unsigned long t4;
+    unsigned long t5;
+    unsigned long t6;
+    unsigned long a0;
+    unsigned long a1;
+    unsigned long a2;
+    unsigned long a3;
+    unsigned long a4;
+    unsigned long a5;
+    unsigned long a6;
+    unsigned long a7;
+};
 
 #define K_ISR_ENTRY_IMPL(name, func)                                                                                   \
     K_ISR_ENTRY void name()                                                                                            \
@@ -120,34 +140,154 @@
         asm volatile("sret");                                                                                          \
     }
 
-K_ISR void isr_softirq()
+K_ISR void k_isr_softirq()
 {
-    printf("Software interrupt for hart %i\n",hartid);
+    printf("Software interrupt for hart %i\n", hartid);
     extern thread_local bool k_halt;
     k_halt = true;
     csr_clear(CSR_SIP, SIP_SSIP);
 }
 
-K_ISR void isr_timer()
+K_ISR void k_isr_timer()
 {
     auto time = csr_read(CSR_TIME);
-    printf("Timer interrupt for hart %i\n",hartid);
+    printf("Timer interrupt for hart %i\n", hartid);
     printf("Current Time: %ld\n", time);
-    if(time > 10 * 10000000){
+    if (time > 3 * 10000000)
+    {
         SBIF::IPI::sendIPI(-1, 0);
         SBIF::Timer::clearTimer();
         return;
     }
     auto rc = SBIF::Timer::setTimer(time + 10000000);
-    if(rc)
+    if (rc)
         printf("Cannot reset timer: %ld\n", rc);
 }
 
-K_ISR void isr_extirq()
+K_ISR void k_isr_extirq()
 {
-    printf("External interrupt for hart %i\n",hartid);
+    printf("External interrupt for hart %i\n", hartid);
 }
 
-K_ISR_ENTRY_IMPL(k_softirq_entry, isr_softirq)
-K_ISR_ENTRY_IMPL(k_timer_entry, isr_timer)
-K_ISR_ENTRY_IMPL(k_extirq_entry, isr_extirq)
+K_ISR void k_esr_ecall(saved_context_t *)
+{
+}
+
+K_ISR void k_esr_break(saved_context_t *ctx)
+{
+    bool conti = false;
+    printf("=== Breakpoint at 0x%lx ===\n", csr_read(CSR_SEPC));
+    printf("a0 = %lx\n", ctx->a0);
+    printf("a1 = %lx\n", ctx->a1);
+    printf("a2 = %lx\n", ctx->a2);
+    printf("a3 = %lx\n", ctx->a3);
+    printf("a4 = %lx\n", ctx->a4);
+    printf("a5 = %lx\n", ctx->a5);
+    printf("a6 = %lx\n", ctx->a6);
+    printf("a7 = %lx\n", ctx->a7);
+    printf("t0 = %lx\n", ctx->t0);
+    printf("t1 = %lx\n", ctx->t1);
+    printf("t2 = %lx\n", ctx->t2);
+    printf("t3 = %lx\n", ctx->t3);
+    printf("t4 = %lx\n", ctx->t4);
+    printf("t5 = %lx\n", ctx->t5);
+    printf("t6 = %lx\n", ctx->t6);
+    printf("ra = %lx\n", ctx->ra);
+    printf("gp = %lx\n", ctx->gp);
+    printf("tp = %lx\n", ctx->tp);
+    printf("sp = %lx\n",
+           csr_read(CSR_SSCRATCH) == 0 ? (unsigned long)ctx - sizeof(saved_context_t) : csr_read(CSR_SSCRATCH));
+    printf("=== Set local variable 'conti' to true to continue ===\n");
+    while (!conti)
+        ;
+    csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 2);
+}
+
+// clang-format off
+K_ISR_ENTRY void k_exception_entry(){
+    #define _K_EXC_JUMP_HELPER(func) \
+        ".align 4 \n"  \
+        "call 4f \n" \
+        "mv a0, sp \n" \
+        "call " #func " \n" \
+        "j 5f \n"
+
+    #define _K_EXC_NO_HANDLER() \
+        ".align 4 \n" \
+        "j 3f \n"
+
+    K_ISR_SWITCH_SP();
+    asm volatile(
+        // We only save necessary registers here (gp and tp are not following the ABI, as they are overwritten later)
+        REG_S " ra, -" _VSTR((SAVE_SPACE - 0) * REG_SIZE) "(sp) \n" 
+        REG_S " gp, -" _VSTR((SAVE_SPACE - 1) * REG_SIZE) "(sp) \n" 
+        REG_S " tp, -" _VSTR((SAVE_SPACE - 2) * REG_SIZE) "(sp) \n" 
+
+        "csrr gp, scause \n"
+        "bltz gp, 3f \n" // Highest bit is 1, which means it's an interrupt
+        "li tp, 15 \n"
+        "bge gp, tp, 2f \n" // Exception code >= 16, not implemented!
+        // Calc jump address (in tp)
+        "lla tp, 1f \n"
+        "slli gp, gp, 4 \n" // 16 bytes per entry
+        "add tp, tp, gp \n" 
+        "jr tp \n"
+    );
+    // Here we construct a jump table
+    asm volatile(
+        "1: \n"
+        _K_EXC_NO_HANDLER() // 0
+        _K_EXC_NO_HANDLER() // 1
+        _K_EXC_NO_HANDLER() // 2
+        _K_EXC_JUMP_HELPER(k_esr_break) // 3 - EBreak
+        _K_EXC_NO_HANDLER() // 4
+        _K_EXC_NO_HANDLER() // 5
+        _K_EXC_NO_HANDLER() // 6
+        _K_EXC_NO_HANDLER() // 7
+        _K_EXC_JUMP_HELPER(k_esr_ecall) // 8 - ecall on U-mode
+        _K_EXC_NO_HANDLER() // 9
+        _K_EXC_NO_HANDLER() // 10
+        _K_EXC_NO_HANDLER() // 11
+        _K_EXC_NO_HANDLER() // 12
+        _K_EXC_NO_HANDLER() // 13
+        _K_EXC_NO_HANDLER() // 14
+        _K_EXC_NO_HANDLER() // 15
+    );
+
+
+    // No handler, restore and hang...
+    asm volatile(
+        "2: \n"
+        "3: \n"
+        REG_L " ra, -" _VSTR((SAVE_SPACE - 0) * REG_SIZE) "(sp) \n" 
+        REG_L " gp, -" _VSTR((SAVE_SPACE - 1) * REG_SIZE) "(sp) \n" 
+        REG_L " tp, -" _VSTR((SAVE_SPACE - 2) * REG_SIZE) "(sp) \n" 
+    );
+    K_ISR_SWITCH_SP();
+
+    asm volatile("j _start_hang \n");
+
+    // Internal function to save context
+    asm volatile(
+        "4: \n"
+        "add sp, sp, -" _VSTR(SAVE_SPACE * REG_SIZE) " \n" 
+        /* ra, tp , gp already saved, skipped */
+        _K_ISR_SAVE_CONTEXT_NORMAL
+        _K_ISR_SAVE_RECALC_PTRS
+        "ret \n" 
+    );
+
+    // Internal routine to restore context
+    asm volatile("5: \n");
+    K_ISR_RESTORE_CONTEXT();
+    K_ISR_SWITCH_SP();
+    asm volatile("sret \n");
+
+    #undef _K_EXC_JUMP_HELPER
+    #undef _K_EXC_NO_HANDLER
+}
+// clang-format on
+
+K_ISR_ENTRY_IMPL(k_softirq_entry, k_isr_softirq)
+K_ISR_ENTRY_IMPL(k_timer_entry, k_isr_timer)
+K_ISR_ENTRY_IMPL(k_extirq_entry, k_isr_extirq)

@@ -242,6 +242,7 @@ int k_main(int hartid)
 
 int k_after_main(int hartid, int main_ret)
 {
+    ebreak();
     csr_clear(CSR_SIE, (uint64_t)-1);
     if (hartid < 0) // Negitive hartid for non-boot hart
     {
