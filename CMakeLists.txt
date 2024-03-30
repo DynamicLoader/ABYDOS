@@ -54,7 +54,7 @@ target_compile_options(AbydOS_KNL
     PUBLIC -mabi=${PL_ABI}
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
-    # PUBLIC -DDEBUG
+    PUBLIC -DDEBUG
 )
 
 target_link_options(AbydOS_KNL

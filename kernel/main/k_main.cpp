@@ -16,13 +16,14 @@ std::function<int(const char *, int size)> k_stdout_func;
 bool k_stdout_switched = false;
 
 SysRoot *sysroot = nullptr;
+SysCPU *syscpu;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 
 // Only write from boot core
 k_stage_t k_stage = K_BEFORE_BOOT;
 
-std::atomic_int k_hart_state[8] = {0};
+std::atomic_int k_hart_state[K_CONFIG_MAX_PROCESSORS] = {0};
 
 int k_boot(void **sys_stack_base)
 {
@@ -73,6 +74,27 @@ int k_boot(void **sys_stack_base)
         std::cout << "Compatible: " << sysroot->compatible() << std::endl;
         std::cout << "Stdout: " << sysroot->stdout_path() << std::endl;
         std::cout << "Bootargs: " << sysroot->bootargs() << std::endl;
+        std::cout << "====================" << std::endl;
+    }
+
+    auto scpuhdl = DriverManager::getDrvByPath(k_fdt, "/cpus", (void **)&syscpu);
+    if (scpuhdl < 0)
+    {
+        std::cout << "[E] SysCPU not installed properly... Kernel Panic!" << std::endl;
+        return K_ENOSPC;
+    }
+    else
+    {
+        auto cpus = syscpu->CPUs();
+        std::cout << "CPU Timebase frequency: " << syscpu->tfreq() << std::endl;
+        for (auto x : cpus)
+        {
+            std::cout << "CPU # " << x.hid << std::endl;
+            std::cout << "+ State : " << (x.state ? "okay" : "failed") << std::endl;
+            std::cout << "+ XLEN  : " << (int)x.xlen << std::endl;
+            std::cout << "+ MMU   : SV" << (int)x.mmu << std::endl;
+            std::cout << "+ Exts  : " << x.extension << std::endl;
+        }
         std::cout << "====================" << std::endl;
     }
 
@@ -188,8 +210,10 @@ int k_boot_harts(int boot_hartid)
     k_stage = K_BOOT_HARTS;
     extern char _start_hart;
     printf("> Booting harts...\n");
-    for (int i = 0; i < 8; i++)
+    auto cpus = syscpu->CPUs();
+    for (auto x : cpus)
     {
+        int i = x.hid;
         if (i == boot_hartid)
             continue;
         auto rc = SBIF::HSM::getHartState(i);
@@ -284,7 +308,7 @@ int k_after_main(int hartid, int main_ret)
         do // a timeout can be added here
         {
             flag = 0;
-            for (int i = 0; i < 8; ++i)
+            for (int i = 0; i < K_CONFIG_MAX_PROCESSORS; ++i)
             {
                 if (i == hartid)
                     continue;

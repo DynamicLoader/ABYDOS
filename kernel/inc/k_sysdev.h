@@ -41,14 +41,40 @@ class SysMem : public DriverBase
         return DEV_TYPE_SYS;
     }
 
-    virtual void addReservedMem(uint64_t addr,uint64_t size) = 0;
+    virtual void addReservedMem(uint64_t addr, uint64_t size) = 0;
 
-    __K_PROP_EXPORT__(reservedMem, _mem_rsv);
-    __K_PROP_EXPORT__(availableMem, _mem_avail);
+    __K_PROP_EXPORT__(reservedMem, _mem_rsv)
+    __K_PROP_EXPORT__(availableMem, _mem_avail)
 
-    protected:
-        std::vector<std::pair<size_t,size_t>> _mem_rsv;
-        std::vector<std::pair<size_t,size_t>> _mem_avail;
+  protected:
+    std::vector<std::pair<size_t, size_t>> _mem_rsv;
+    std::vector<std::pair<size_t, size_t>> _mem_avail;
+};
+
+class SysCPU : public DriverBase
+{
+  public:
+    struct cpu_t
+    {
+        uint64_t hid;
+        bool state;
+        uint8_t xlen;
+        uint8_t mmu;
+        std::string extension;
+    };
+
+    dev_type_t getDeviceType() override
+    {
+        return DEV_TYPE_SYS;
+    }
+
+    __K_PROP_EXPORT__(tfreq, timebase_freq)
+    __K_PROP_EXPORT__(CPUs, _cpus)
+
+  protected:
+    unsigned long timebase_freq = 0; // 0 by default, which means no timebase
+
+    std::vector<cpu_t> _cpus;
 };
 
 #undef __K_PROP_EXPORT__

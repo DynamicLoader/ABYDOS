@@ -25,7 +25,7 @@ int DriverManager::probe(const void *fdt, dev_type_t type, int node)
 
     if (tret > 1)
     {
-        printf("Driver has cover the node with offset: %i\n", node);
+        // printf("Driver has cover the node with offset: %i\n", node);
         return 0;
     }
 
