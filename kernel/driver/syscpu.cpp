@@ -65,7 +65,7 @@ class GenericCPU : public SysCPU
         auto mmu = fdt_getprop(fdt, node, "mmu-type", &len);
         if (len < 0)
         {
-            printf("[E] Invalid CPU MMU type ");
+            printf("[E] No MMU ");
             return K_EINVAL;
         }
         std::string mmutype((const char *)mmu, len);

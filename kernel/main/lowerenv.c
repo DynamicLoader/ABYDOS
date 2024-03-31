@@ -20,12 +20,7 @@
 
 void *k_fdt = NULL;
 
-// struct sbiret sbi_ecall(int ext, int fid, unsigned long arg0, unsigned long arg1, unsigned long arg2,
-//                         unsigned long arg3, unsigned long arg4, unsigned long arg5)
-
-
 unsigned long k_heap_max = 0;
-// extern void *end;
 
 void *_sbrk(ptrdiff_t incr)
 {
@@ -102,10 +97,3 @@ void k_clearup(int main_ret)
     printf("* Kernel heap usage: %li\n", k_heap_max);
     printf("===== Test Kernel exited with %i =====\n", main_ret);
 }
-
-// void *k_getHartLocal()
-// {
-//     extern uintptr_t _sys_stack_base;
-//     extern char _KERNEL_HART_LOCAL_DATA_SIZE;
-//     return (void *)(_sys_stack_base - (uintptr_t)&_KERNEL_HART_LOCAL_DATA_SIZE);
-// }

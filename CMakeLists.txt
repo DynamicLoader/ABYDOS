@@ -40,6 +40,9 @@ file(GLOB KNL_SRC
 
     # libfdt
     ${CMAKE_SOURCE_DIR}/deps/libfdt/*.c
+
+    # test user mode
+    ${CMAKE_SOURCE_DIR}/app/*.S
 )
 
 add_executable(AbydOS_KNL ${KNL_SRC})

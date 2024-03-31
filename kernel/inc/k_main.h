@@ -26,11 +26,12 @@ extern "C"
         K_CLEARUP = 5
     };
 
-    extern k_stage_t k_stage;
+    extern volatile k_stage_t k_stage;
     extern bool k_stdout_switched;
 
     extern thread_local _reent hl_reent;
     extern thread_local int hartid;
+    extern thread_local volatile void* k_local_resume;
 
     int k_boot(void **);
     int k_boot_perip();

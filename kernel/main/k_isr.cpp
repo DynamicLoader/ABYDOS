@@ -3,6 +3,7 @@
 
 #include "k_defs.h"
 #include "k_main.h"
+#include "syscall.h"
 #include "k_sbif.hpp"
 
 #define _K_ISR_SP_OFFSET -8
@@ -146,6 +147,10 @@ K_ISR void k_isr_softirq()
     extern thread_local bool k_halt;
     k_halt = true;
     csr_clear(CSR_SIP, SIP_SSIP);
+    if(k_local_resume){
+        csr_write(CSR_SEPC, k_local_resume);
+        csr_set(CSR_SSTATUS,SSTATUS_SPP);
+    }
 }
 
 K_ISR void k_isr_timer()
@@ -169,13 +174,19 @@ K_ISR void k_isr_extirq()
     printf("External interrupt for hart %i\n", hartid);
 }
 
-K_ISR void k_esr_ecall(saved_context_t *)
+K_ISR void k_esr_ecall(saved_context_t *ctx)
 {
+    printf("ECall from U-mode at 0x%lx\n", csr_read(CSR_SEPC));
+    if(ctx->a0 == SYSCALL_PRINTF){
+        printf("[UMODE] ");
+        printf((const char*)(ctx->a1),ctx->a2,ctx->a3,ctx->a4); // only for test, not safe at all
+    }
+    csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 4);
 }
 
 K_ISR void k_esr_break(saved_context_t *ctx)
 {
-    bool conti = false;
+    bool volatile conti = false;
     printf("=== Breakpoint at 0x%lx ===\n", csr_read(CSR_SEPC));
     printf("a0 = %lx\n", ctx->a0);
     printf("a1 = %lx\n", ctx->a1);

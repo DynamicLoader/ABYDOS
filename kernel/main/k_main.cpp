@@ -21,7 +21,7 @@ SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 
 // Only write from boot core
-k_stage_t k_stage = K_BEFORE_BOOT;
+volatile k_stage_t k_stage = K_BEFORE_BOOT;
 
 std::atomic_int k_hart_state[K_CONFIG_MAX_PROCESSORS] = {0};
 
@@ -125,7 +125,29 @@ int k_boot(void **sys_stack_base)
 
     // Setup MMU
     auto rc = 0;
-    sysmmu = new SV39MMU(-1);
+    int mmu_type = 0xFF;
+    // find the smallest MMU type
+    for (auto x : syscpu->CPUs())
+    {
+        if (x.mmu < mmu_type)
+            mmu_type = x.mmu;
+    }
+    if (mmu_type == 0xFF || mmu_type == 32)
+    { // Currently only support RV64
+        std::cout << "[E] Invalid MMU config... Kernel Panic!" << std::endl;
+        return K_EINVAL;
+    }
+    if (mmu_type == 39)
+        sysmmu = new SV39MMU(-1);
+    else if (mmu_type == 48)
+        sysmmu = new SV48MMU(-1);
+    else if (mmu_type == 57)
+        sysmmu = new SV57MMU(-1);
+    else
+    {
+        std::cout << "[E] Unsupported MMU type... Kernel Panic!" << std::endl;
+        return K_ENOTSUPP;
+    }
     // Lower 4G: Direct mapping
     rc =
         sysmmu->map(0, 0, 4 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
@@ -277,14 +299,47 @@ int k_premain(int hartid)
     return hartid; // keep hart id in a0
 }
 
-thread_local bool volatile k_halt = false;
+thread_local volatile bool k_halt = false;
+thread_local volatile void *k_local_resume = nullptr;
+
+void runUserAPP()
+{
+    extern char _umode_start, _umode_end;
+    if (!k_local_resume)
+    {
+        size_t len = &_umode_end - &_umode_start;
+        len = len & 0xFFF ? (len & ~0xFFFULL) + 0x1000 : len; // align to 4K
+        auto dst = alignedMalloc<uint8_t>(len, 4096);
+        memcpy(dst, &_umode_start, &_umode_end - &_umode_start);
+        // For test now, we'd copy a mmu table with different ASID to support Task Scheduling
+        auto runaddr = sysmmu->getVMAUpperBottom();
+        sysmmu->map(runaddr, (uintptr_t)dst, len,
+                    MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
+        sysmmu->apply();
+
+        // disable interrupt for now
+        csr_write(CSR_SSTATUS, (csr_read(CSR_SSTATUS) | SSTATUS_SUM) & ~SSTATUS_SIE &
+                                   ~SSTATUS_SPP); // permit read U-mode page from S-mode
+        k_local_resume = &&_resume;
+        asm volatile("csrw sscratch, sp \n" //  save sp in sscratch
+                     "csrw sepc, %0 \n"     //  set sepc to the entry
+                     "sret"                 // switch to user mode
+                     ::"r"(runaddr)
+                     : "memory");
+    }
+
+_resume:
+    asm volatile("csrw sscratch, zero \n" //  clear sscratch
+    );
+    printf("Resume from U-mode!");
+}
 
 int k_main(int hartid)
 {
 
     printf("Hello from hart %d!\n", hartid);
     while (!k_halt)
-        ;
+        runUserAPP();
 
     // printf("Hart %d is running!\n", hartid);
     return 0;
