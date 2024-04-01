@@ -14,7 +14,7 @@
 #include <cstdint>
 #include "k_drvif.h"
 
-#include "riscv_io.h"
+#include "sbi/riscv_io.h"
 
 #define UART_RBR_OFFSET 0  /* In:  Recieve Buffer Register */
 #define UART_THR_OFFSET 0  /* Out: Transmitter Holding Register */

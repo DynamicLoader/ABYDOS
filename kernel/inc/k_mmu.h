@@ -3,7 +3,7 @@
 
 #include "k_sysdev.h"
 #include "k_mem.h"
-#include "riscv_asm.h"
+#include "sbi/riscv_asm.h"
 #include "sbi/riscv_encoding.h"
 
 class MMUBase

@@ -83,9 +83,9 @@ int k_early_boot(const void *fdt)
 void k_clearup(int main_ret)
 {
     // k_stdout_switched = false; // switching back to default stdout
-    printf("\nReached k_after_main, clearing up...\n");
+    printf("\nReached k_clearup, clearing up...\n");
 
-    extern void __cxa_finalize(void *f); // in k_cxxabi.h
+    extern void __cxa_finalize(void *f); // in k_cxxabi.cpp
     __cxa_finalize(NULL);
 
     typedef void (*__init_func_ptr)();

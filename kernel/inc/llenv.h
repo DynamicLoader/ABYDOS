@@ -2,9 +2,9 @@
 #ifndef __LLENV_H__
 #define __LLENV_H__
 
-#include <sbi/sbi_ecall_interface.h>
-#include <sbi/riscv_encoding.h>
-#include "riscv_asm.h"
+#include "sbi/sbi_ecall_interface.h"
+#include "sbi/riscv_encoding.h"
+#include "sbi/riscv_asm.h"
 #include <stdint.h>
 #include <reent.h>
 
