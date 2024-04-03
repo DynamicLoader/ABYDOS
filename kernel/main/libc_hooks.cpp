@@ -12,9 +12,22 @@ extern "C"
     // Hook with libc
     int _write(int fd, char *buf, int size)
     {
+        static int support_dbcn = -1;
+        if (support_dbcn < 0)
+        {
+            support_dbcn = sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_PROBE_EXT, SBI_EXT_DBCN, 0, 0, 0, 0, 0).value;
+        }
         if (k_stdout_switched)
             return k_stdout_func(buf, size);
-        sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf, 0, 0, 0, 0);
+        if (support_dbcn > 0)
+            sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf, 0, 0, 0, 0);
+        else
+        {
+            for (int i = 0; i < size; i++)
+            {
+                sbi_ecall(SBI_EXT_0_1_CONSOLE_PUTCHAR, 0, buf[i], 0, 0, 0, 0, 0);
+            }
+        }
         return size;
     }
 

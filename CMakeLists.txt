@@ -10,7 +10,7 @@ set(CMAKE_SYSTEM_PROCESSOR rv64)
 set(Toolchain_Prefix riscv64-unknown-elf-)
 
 set(PL_ABI lp64)
-set(PL_ISA rv64imac_zicsr)
+set(PL_ISA rv64imac_zicsr_zifencei)
 set(PL_MDL medany)
 
 # get rid of '-rdynamic'
@@ -20,8 +20,8 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 # set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
-set(CMAKE_C_FLAGS "-g -Wall -O2 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls")
-set(CMAKE_CXX_FLAGS "-g -Wall -O2 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
+set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
 set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")
@@ -56,7 +56,7 @@ target_compile_options(AbydOS_KNL
     PUBLIC -mabi=${PL_ABI}
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
-    PUBLIC -DDEBUG
+    # PUBLIC -DDEBUG
 )
 
 target_link_options(AbydOS_KNL
@@ -77,4 +77,10 @@ add_custom_target(AbydOS_KNL_BIN ALL
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     BYPRODUCTS AbydOS.bin
     DEPENDS AbydOS_KNL
+)
+
+add_custom_target(abydos.ub ALL
+    COMMAND mkimage -A riscv -O linux -T kernel -C none -e 0x80100000 -a 0x80100000 -d AbydOS.bin abydos.ub
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    DEPENDS AbydOS_KNL_BIN
 )

@@ -9,7 +9,7 @@
 class MMUBase
 {
   public:
-    static constexpr int PROT_NONE = 0, PROT_R = 1, PROT_W = 2, PROT_X = 4, PROT_U = 8, PROT_G = 16;
+    static constexpr int PROT_NONE = 0, PROT_R = 1, PROT_W = 2, PROT_X = 4, PROT_U = 8, PROT_G = 16, PROT_IO = 32;
 
     /**
      * @brief Set MMU state
@@ -46,15 +46,27 @@ class RV64MMUBase : public MMUBase
         if (enable)
         {
             csr_write(CSR_SATP, *(uint64_t *)(&_satp));
+            asm volatile("fence.i \n"
+                         "sfence.vma \n"
+                         "fence.i \n");
             if (csr_read(CSR_SATP) != *(uint64_t *)(&_satp))
+            {
+                printf("Expected %lx, got %lx\n", *(uint64_t *)(&_satp), csr_read(CSR_SATP));
+                csr_write(CSR_SATP, 0);
+                asm volatile("fence.i \n"
+                             "sfence.vma \n"
+                             "fence.i \n");
                 return false;
+            }
             sfence_vma();
             return true;
         }
         else
         {
             csr_write(CSR_SATP, 0);
-            sfence_vma();
+            asm volatile("fence.i \n"
+                         "sfence.vma \n"
+                         "fence.i \n");
             return true;
         }
     }
@@ -178,11 +190,13 @@ class RV64MMUBase : public MMUBase
         // C++ 17 enabled!
         template <uint8_t sz> auto fit()
         {
+            // this->rsw = 0;
             this->reserved = 0;
             if constexpr (sz <= 39)
                 this->ppn3 = 0;
             if constexpr (sz <= 48)
                 this->ppn4 = 0;
+
             return *this;
         }
 
@@ -223,7 +237,7 @@ class RV64MMUBase : public MMUBase
         return true;
     }
 
-    void getSATP(void * ret) override
+    void getSATP(void *ret) override
     {
         *(satp_t *)ret = _satp;
     }
@@ -253,6 +267,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     RV64MMU(uint16_t asid) : RV64MMUBase(_mmutype(), asid)
     {
         _ptes = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
+        memset(_ptes, 0, 4096);
         setPPN((uintptr_t)_ptes);
     }
     ~RV64MMU()
@@ -452,7 +467,9 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
     void apply() override
     {
-        sfence_vma();
+        asm volatile("fence.i \n"
+                     "sfence.vma \n"
+                     "fence.i \n");
     }
 
   protected:
@@ -510,6 +527,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         else
         {
             thisPTE = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
+            memset(thisPTE, 0, 4096);
             parent->ppn((uintptr_t)thisPTE);
             parent->v = 1;
             parent->r = 0;
@@ -568,9 +586,14 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         pte->x = prot & PROT_X ? 1 : 0;
         pte->u = prot & PROT_U ? 1 : 0;
         pte->g = prot & PROT_G ? 1 : 0;
+        // For compatibility (two methods of handling dirty and accessed bits)
+        pte->d = pte->w;
+        pte->a = pte->r;
 
         pte->ppn(paddr);
         pte->template fit<sz>();
+        if (!(prot & PROT_IO))
+            pte->reserved = 0x180; // T-Head Extension C & B
         // printf("Now PTE value: %lx\n", *(uintptr_t *)pte);
         return 0;
     }

@@ -36,6 +36,11 @@ SECTIONS
 		PROVIDE(_text_end = .);
 	}
 
+	.umode : {
+		*(.umode.*)
+		. = ALIGN(8);
+	}
+
 	/* . = ALIGN(0x1000); */
 
 	.init_array :

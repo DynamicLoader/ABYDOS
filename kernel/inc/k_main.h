@@ -31,6 +31,7 @@ extern "C"
 
     extern thread_local _reent hl_reent;
     extern thread_local int hartid;
+    extern thread_local volatile unsigned long cpuclock;
     extern thread_local volatile void* k_local_resume;
 
     int k_boot(void **);

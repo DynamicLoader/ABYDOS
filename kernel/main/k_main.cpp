@@ -10,8 +10,6 @@
 #include "k_sysdev.h"
 #include "k_mmu.h"
 
-SBIF::DBCN dbg;
-
 std::function<int(const char *, int size)> k_stdout_func;
 bool k_stdout_switched = false;
 
@@ -137,12 +135,21 @@ int k_boot(void **sys_stack_base)
         std::cout << "[E] Invalid MMU config... Kernel Panic!" << std::endl;
         return K_EINVAL;
     }
-    if (mmu_type == 39)
+    if (mmu_type == 39 || 1)
+    {
         sysmmu = new SV39MMU(-1);
+        std::cout << "Using SV39 MMU\n";
+    }
     else if (mmu_type == 48)
+    {
         sysmmu = new SV48MMU(-1);
+        std::cout << "Using SV48 MMU\n";
+    }
     else if (mmu_type == 57)
+    {
         sysmmu = new SV57MMU(-1);
+        std::cout << "Using SV57 MMU\n";
+    }
     else
     {
         std::cout << "[E] Unsupported MMU type... Kernel Panic!" << std::endl;
@@ -150,20 +157,50 @@ int k_boot(void **sys_stack_base)
     }
     // Lower 4G: Direct mapping
     rc =
-        sysmmu->map(0, 0, 4 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+        sysmmu->map(0, 0, 2 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G | MMUBase::PROT_IO);
+        sysmmu->map(2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
     if (rc < 0)
     {
         std::cout << "[E] Failed to map lower 4G: " << rc << std::endl;
         return K_EFAIL;
     }
 
+    std::cout << std::hex << "SP: " << ({
+        unsigned long __v;
+        asm volatile("mv %0,sp" : "=r"(__v)::"memory");
+        __v;
+    }) << std::dec
+              << std::endl;
+    std::cout << std::hex << "GP: " << ({
+        unsigned long __v;
+        asm volatile("mv %0,gp" : "=r"(__v)::"memory");
+        __v;
+    }) << std::dec
+              << std::endl;
+    asm volatile(
+        "lla t0,_mmutest \n"
+        "li t1,1 \n"
+        "amoadd.w t2,t1,(t0) \n"
+        "sw t2, (t0) \n"
+         ::: "memory", "t0", "t1", "t2");
     std::cout << "Enabling MMU..." << std::flush;
     if (!sysmmu->enable(true))
     {
-        std::cout << "Failed!" << std::endl;
+        // std::cout << "Failed!" << std::endl;
+        printf("Failed!\n");
         return K_EFAIL;
     }
-    std::cout << "OK!" << std::endl;
+    sfence_vma();
+    // std::cout << "OK!" << std::endl;
+    printf("OK!\n");
+
+    asm volatile(
+        "lla t0,_mmutest \n"
+        "li t1,1 \n"
+        "amoadd.w t2,t1,(t0) \n"
+        "sw t2, (t0) \n"
+         ::: "memory", "t0", "t1", "t2");
+    printf("Tested.\n");
 
     // auto a = alignedMalloc<long>(4096, 4096);
     // printf("Original addr of a: 0x%lx\n", (uintptr_t)a);
@@ -231,13 +268,15 @@ int k_boot_harts(int boot_hartid)
 {
     k_stage = K_BOOT_HARTS;
     extern char _start_hart;
-    printf("> Booting harts...\n");
+    printf("> Booting harts... (Boot hart = %i)\n", boot_hartid);
     auto cpus = syscpu->CPUs();
     for (auto x : cpus)
     {
         int i = x.hid;
+        printf("%i %ld\n", i, x.hid);
         if (i == boot_hartid)
             continue;
+        printf("%i %ld\n", i, x.hid);
         auto rc = SBIF::HSM::getHartState(i);
         if (rc < 0) // invalid core, skip
             continue;
@@ -262,6 +301,7 @@ int k_boot_harts(int boot_hartid)
             printf("Hart %d is in a state of %ld\n", i, rc);
         }
     }
+    printf("> After hart boot\n");
     k_hart_state[boot_hartid] = 1;
     printf("> Switching to multicore mode\n");
     k_stage = K_MULTICORE;
@@ -270,6 +310,9 @@ int k_boot_harts(int boot_hartid)
 
 thread_local _reent hl_reent;
 thread_local int hartid;
+thread_local volatile bool k_halt = false;
+thread_local volatile unsigned long cpuclock = 0;
+thread_local volatile void *k_local_resume = nullptr;
 
 // to be run by each hart
 int k_premain(int hartid)
@@ -277,9 +320,12 @@ int k_premain(int hartid)
 
     _REENT_INIT_PTR(&hl_reent);
     ::hartid = hartid;
+    cpuclock = syscpu->tfreq();
+    if(!cpuclock)
+        cpuclock = 10000000;
 
     // Setup Hart Timer
-    auto rc = SBIF::Timer::setTimer(hartid * 10000000);
+    auto rc = SBIF::Timer::setTimer(hartid * cpuclock);
     if (rc)
     {
         printf("Failed to set timer: %ld\n", rc);
@@ -298,9 +344,6 @@ int k_premain(int hartid)
     csr_set(CSR_SSTATUS, SSTATUS_SIE);
     return hartid; // keep hart id in a0
 }
-
-thread_local volatile bool k_halt = false;
-thread_local volatile void *k_local_resume = nullptr;
 
 void runUserAPP()
 {

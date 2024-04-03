@@ -65,6 +65,8 @@ _prep_boot:
 	lla	a3, _kernel_end
 	li	a4, K_CONFIG_KERNEL_STACK_SIZE /* this is fake a address provided from ld */
 	add a4, a4, a4 /* double the size */
+	add a4, a4, a4 /* double the size */
+	add a4, a4, a4 /* double the size */
 	add	sp, a3, a4
 	lla a3, _sys_stack_base
 	REG_S	sp, 0(a3)
@@ -213,8 +215,8 @@ _setup_hart:
 	csrw	CSR_SIP, zero
 
 	/* Setup exception vectors */
-	lla	a3, _start_hang
-	csrw	CSR_STVEC, a3
+	# lla	a3, _start_hang
+	# csrw	CSR_STVEC, a3
 
 	/* Setup system stack base according to hart_id as offset */
 	lla a3, _sys_stack_base
@@ -267,7 +269,7 @@ _fini_setup_hart:
 
 	.section .data
 	.align	3
-	.global _sys_stack_base
+	.global _sys_stack_base, _mmutest
 _hart_lottery:
 	RISCV_PTR	0
 # _boot_a0:  // hart id
@@ -277,4 +279,6 @@ _hart_lottery:
 _sys_stack_base:
 	RISCV_PTR	0
 _sys_satp:
+	RISCV_PTR	0
+_mmutest:
 	RISCV_PTR	0

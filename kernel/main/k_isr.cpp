@@ -147,9 +147,10 @@ K_ISR void k_isr_softirq()
     extern thread_local bool k_halt;
     k_halt = true;
     csr_clear(CSR_SIP, SIP_SSIP);
-    if(k_local_resume){
+    if (k_local_resume)
+    {
         csr_write(CSR_SEPC, k_local_resume);
-        csr_set(CSR_SSTATUS,SSTATUS_SPP);
+        csr_set(CSR_SSTATUS, SSTATUS_SPP);
     }
 }
 
@@ -158,13 +159,13 @@ K_ISR void k_isr_timer()
     auto time = csr_read(CSR_TIME);
     printf("Timer interrupt for hart %i\n", hartid);
     printf("Current Time: %ld\n", time);
-    if (time > 3 * 10000000)
+    if (time > 30 * cpuclock)
     {
         SBIF::IPI::sendIPI(-1, 0);
         SBIF::Timer::clearTimer();
         return;
     }
-    auto rc = SBIF::Timer::setTimer(time + 10000000);
+    auto rc = SBIF::Timer::setTimer(time + cpuclock);
     if (rc)
         printf("Cannot reset timer: %ld\n", rc);
 }
@@ -177,9 +178,10 @@ K_ISR void k_isr_extirq()
 K_ISR void k_esr_ecall(saved_context_t *ctx)
 {
     printf("ECall from U-mode at 0x%lx\n", csr_read(CSR_SEPC));
-    if(ctx->a0 == SYSCALL_PRINTF){
+    if (ctx->a0 == SYSCALL_PRINTF)
+    {
         printf("[UMODE] ");
-        printf((const char*)(ctx->a1),ctx->a2,ctx->a3,ctx->a4); // only for test, not safe at all
+        printf((const char *)(ctx->a1), ctx->a2, ctx->a3, ctx->a4); // only for test, not safe at all
     }
     csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 4);
 }
@@ -212,6 +214,34 @@ K_ISR void k_esr_break(saved_context_t *ctx)
     while (!conti)
         ;
     csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 2);
+}
+
+K_ISR void k_other_exception(saved_context_t *ctx)
+{
+    printf("=== Unhandled exception (%ld) at 0x%lx ===\n", csr_read(CSR_STVAL), csr_read(CSR_SEPC));
+    printf("a0 = %lx\n", ctx->a0);
+    printf("a1 = %lx\n", ctx->a1);
+    printf("a2 = %lx\n", ctx->a2);
+    printf("a3 = %lx\n", ctx->a3);
+    printf("a4 = %lx\n", ctx->a4);
+    printf("a5 = %lx\n", ctx->a5);
+    printf("a6 = %lx\n", ctx->a6);
+    printf("a7 = %lx\n", ctx->a7);
+    printf("t0 = %lx\n", ctx->t0);
+    printf("t1 = %lx\n", ctx->t1);
+    printf("t2 = %lx\n", ctx->t2);
+    printf("t3 = %lx\n", ctx->t3);
+    printf("t4 = %lx\n", ctx->t4);
+    printf("t5 = %lx\n", ctx->t5);
+    printf("t6 = %lx\n", ctx->t6);
+    printf("ra = %lx\n", ctx->ra);
+    printf("gp = %lx\n", ctx->gp);
+    printf("tp = %lx\n", ctx->tp);
+    printf("sp = %lx\n",
+           csr_read(CSR_SSCRATCH) == 0 ? (unsigned long)ctx - sizeof(saved_context_t) : csr_read(CSR_SSCRATCH));
+    printf("System Hang!\n");
+    while (1)
+        ;
 }
 
 // clang-format off
@@ -248,22 +278,22 @@ K_ISR_ENTRY void k_exception_entry(){
     asm volatile(
         ".align 4 \n"
         "1: \n"
-        _K_EXC_NO_HANDLER() // 0
-        _K_EXC_NO_HANDLER() // 1
-        _K_EXC_NO_HANDLER() // 2
+        _K_EXC_JUMP_HELPER(k_other_exception) // 0
+        _K_EXC_JUMP_HELPER(k_other_exception) // 1
+        _K_EXC_JUMP_HELPER(k_other_exception) // 2
         _K_EXC_JUMP_HELPER(k_esr_break) // 3 - EBreak
-        _K_EXC_NO_HANDLER() // 4
-        _K_EXC_NO_HANDLER() // 5
-        _K_EXC_NO_HANDLER() // 6
-        _K_EXC_NO_HANDLER() // 7
+        _K_EXC_JUMP_HELPER(k_other_exception) // 4
+        _K_EXC_JUMP_HELPER(k_other_exception) // 5
+        _K_EXC_JUMP_HELPER(k_other_exception) // 6
+        _K_EXC_JUMP_HELPER(k_other_exception) // 7
         _K_EXC_JUMP_HELPER(k_esr_ecall) // 8 - ecall on U-mode
-        _K_EXC_NO_HANDLER() // 9
-        _K_EXC_NO_HANDLER() // 10
-        _K_EXC_NO_HANDLER() // 11
-        _K_EXC_NO_HANDLER() // 12
-        _K_EXC_NO_HANDLER() // 13
-        _K_EXC_NO_HANDLER() // 14
-        _K_EXC_NO_HANDLER() // 15
+        _K_EXC_JUMP_HELPER(k_other_exception) // 9
+        _K_EXC_JUMP_HELPER(k_other_exception) // 10
+        _K_EXC_JUMP_HELPER(k_other_exception) // 11
+        _K_EXC_JUMP_HELPER(k_other_exception) // 12
+        _K_EXC_JUMP_HELPER(k_other_exception) // 13
+        _K_EXC_JUMP_HELPER(k_other_exception) // 14
+        _K_EXC_JUMP_HELPER(k_other_exception) // 15
     );
 
 
