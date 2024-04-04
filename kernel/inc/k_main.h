@@ -28,10 +28,10 @@ extern "C"
 
     extern volatile k_stage_t k_stage;
     extern bool k_stdout_switched;
+    extern volatile unsigned long k_cpuclock;
 
     extern thread_local _reent hl_reent;
     extern thread_local int hartid;
-    extern thread_local volatile unsigned long cpuclock;
     extern thread_local volatile void* k_local_resume;
 
     int k_boot(void **);

@@ -159,13 +159,13 @@ K_ISR void k_isr_timer()
     auto time = csr_read(CSR_TIME);
     printf("Timer interrupt for hart %i\n", hartid);
     printf("Current Time: %ld\n", time);
-    if (time > 30 * cpuclock)
+    if (time > 30 * k_cpuclock)
     {
         SBIF::IPI::sendIPI(-1, 0);
         SBIF::Timer::clearTimer();
         return;
     }
-    auto rc = SBIF::Timer::setTimer(time + cpuclock);
+    auto rc = SBIF::Timer::setTimer(time + k_cpuclock);
     if (rc)
         printf("Cannot reset timer: %ld\n", rc);
 }

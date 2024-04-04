@@ -18,6 +18,8 @@ SysCPU *syscpu;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 
+volatile unsigned long k_cpuclock = 0;
+
 // Only write from boot core
 volatile k_stage_t k_stage = K_BEFORE_BOOT;
 
@@ -96,6 +98,10 @@ int k_boot(void **sys_stack_base)
         std::cout << "====================" << std::endl;
     }
 
+    k_cpuclock = syscpu->tfreq();
+    if (!k_cpuclock)
+        k_cpuclock = K_CONFIG_CPU_DEFAULT_CLOCK;
+
     auto smhdl = DriverManager::getDrvByPath(
         k_fdt, "/memory",
         (void **)&sysmem); // must found at least one memory node, otherwise the kernel does not run here!
@@ -135,19 +141,23 @@ int k_boot(void **sys_stack_base)
         std::cout << "[E] Invalid MMU config... Kernel Panic!" << std::endl;
         return K_EINVAL;
     }
-    if (mmu_type == 39 || 1)
+    int mmu_variant = 0;
+    auto vid = SBIF::Base::getVID();
+    if (vid == 0x5B7) // T-head C906
+        mmu_variant = RV64MMUBase::VARIANT_THEAD_C906;
+    if (mmu_type == 39)
     {
-        sysmmu = new SV39MMU(-1);
+        sysmmu = new SV39MMU(-1, mmu_variant);
         std::cout << "Using SV39 MMU\n";
     }
     else if (mmu_type == 48)
     {
-        sysmmu = new SV48MMU(-1);
+        sysmmu = new SV48MMU(-1, mmu_variant);
         std::cout << "Using SV48 MMU\n";
     }
     else if (mmu_type == 57)
     {
-        sysmmu = new SV57MMU(-1);
+        sysmmu = new SV57MMU(-1, mmu_variant);
         std::cout << "Using SV57 MMU\n";
     }
     else
@@ -156,9 +166,10 @@ int k_boot(void **sys_stack_base)
         return K_ENOTSUPP;
     }
     // Lower 4G: Direct mapping
-    rc =
-        sysmmu->map(0, 0, 2 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G | MMUBase::PROT_IO);
-        sysmmu->map(2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+    rc = sysmmu->map(0, 0, 2 * 1024 * 1048576ULL,
+                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G | MMUBase::PROT_IO);
+    sysmmu->map(2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL,
+                MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
     if (rc < 0)
     {
         std::cout << "[E] Failed to map lower 4G: " << rc << std::endl;
@@ -177,12 +188,11 @@ int k_boot(void **sys_stack_base)
         __v;
     }) << std::dec
               << std::endl;
-    asm volatile(
-        "lla t0,_mmutest \n"
-        "li t1,1 \n"
-        "amoadd.w t2,t1,(t0) \n"
-        "sw t2, (t0) \n"
-         ::: "memory", "t0", "t1", "t2");
+    asm volatile("lla t0,_mmutest \n"
+                 "li t1,1 \n"
+                 "amoadd.w t2,t1,(t0) \n"
+                 "sw t2, (t0) \n" ::
+                     : "memory", "t0", "t1", "t2");
     std::cout << "Enabling MMU..." << std::flush;
     if (!sysmmu->enable(true))
     {
@@ -190,29 +200,15 @@ int k_boot(void **sys_stack_base)
         printf("Failed!\n");
         return K_EFAIL;
     }
-    sfence_vma();
     // std::cout << "OK!" << std::endl;
-    printf("OK!\n");
+    printf("OK!");
 
-    asm volatile(
-        "lla t0,_mmutest \n"
-        "li t1,1 \n"
-        "amoadd.w t2,t1,(t0) \n"
-        "sw t2, (t0) \n"
-         ::: "memory", "t0", "t1", "t2");
+    asm volatile("lla t0,_mmutest \n"
+                 "li t1,1 \n"
+                 "amoadd.w t2,t1,(t0) \n"
+                 "sw t2, (t0) \n" ::
+                     : "memory", "t0", "t1", "t2");
     printf("Tested.\n");
-
-    // auto a = alignedMalloc<long>(4096, 4096);
-    // printf("Original addr of a: 0x%lx\n", (uintptr_t)a);
-    // *a = 1145141919810;
-    // printf("Original value of a: %li\n", *a);
-    // sysmmu->map((uintptr_t)a | 0xFFFFFFC000000000, (uintptr_t)a, 4096, MMUBase::PROT_W | MMUBase::PROT_R);
-    // sysmmu->apply();
-
-    // printf("Mapped addr of a: 0x%lx\n", (uintptr_t)a | 0xFFFFFFC000000000);
-    // printf("Mapped value of a: %li\n", *(long *)((uintptr_t)a | 0xFFFFFFC000000000));
-    // *(long *)((uintptr_t)a | 0xFFFFFFC000000000) = 1919810114514;
-    // printf("We modified from mapped, now the original value is %li\n", *a);
 
     size_t boot_stack_size = K_CONFIG_KERNEL_STACK_SIZE;
     auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
@@ -273,10 +269,8 @@ int k_boot_harts(int boot_hartid)
     for (auto x : cpus)
     {
         int i = x.hid;
-        printf("%i %ld\n", i, x.hid);
         if (i == boot_hartid)
             continue;
-        printf("%i %ld\n", i, x.hid);
         auto rc = SBIF::HSM::getHartState(i);
         if (rc < 0) // invalid core, skip
             continue;
@@ -292,16 +286,24 @@ int k_boot_harts(int boot_hartid)
                 k_hart_state[i] = 0; // reset to 0
                 continue;
             }
-            while (k_hart_state[i] < 2)
-                ; // timeout here!
-            printf("OK!\n");
+            auto t = csr_read(CSR_TIME);
+            while (k_hart_state[i] < 2 && csr_read(CSR_TIME) - t < 3 * k_cpuclock)
+                ; // wait for at most 3s
+            if (k_hart_state[i] >= 2)
+            {
+                printf("OK!\n");
+            }
+            else
+            {
+                printf("Timeout!\n");
+                k_hart_state[i] = 0; // reset to 0
+            }
         }
         else
         {
             printf("Hart %d is in a state of %ld\n", i, rc);
         }
     }
-    printf("> After hart boot\n");
     k_hart_state[boot_hartid] = 1;
     printf("> Switching to multicore mode\n");
     k_stage = K_MULTICORE;
@@ -311,21 +313,22 @@ int k_boot_harts(int boot_hartid)
 thread_local _reent hl_reent;
 thread_local int hartid;
 thread_local volatile bool k_halt = false;
-thread_local volatile unsigned long cpuclock = 0;
+
 thread_local volatile void *k_local_resume = nullptr;
 
 // to be run by each hart
 int k_premain(int hartid)
 {
+    if(k_hart_state[hartid] != 1){ // Not desired to be bootup, maybe timeout, or failed
+        while(1)
+            wfi();
+    }
 
     _REENT_INIT_PTR(&hl_reent);
     ::hartid = hartid;
-    cpuclock = syscpu->tfreq();
-    if(!cpuclock)
-        cpuclock = 10000000;
 
     // Setup Hart Timer
-    auto rc = SBIF::Timer::setTimer(hartid * cpuclock);
+    auto rc = SBIF::Timer::setTimer(hartid * k_cpuclock);
     if (rc)
     {
         printf("Failed to set timer: %ld\n", rc);

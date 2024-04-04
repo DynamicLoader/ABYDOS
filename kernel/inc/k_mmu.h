@@ -41,6 +41,7 @@ class RV64MMUBase : public MMUBase
 {
 
   public:
+    static constexpr int VARIANT_THEAD_C906 = 1;
     bool enable(bool enable) override
     {
         if (enable)
@@ -264,7 +265,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     }
 
   public:
-    RV64MMU(uint16_t asid) : RV64MMUBase(_mmutype(), asid)
+    RV64MMU(uint16_t asid, int variant = 0) : RV64MMUBase(_mmutype(), asid), _variant(variant)
     {
         _ptes = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
         memset(_ptes, 0, 4096);
@@ -592,8 +593,12 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
         pte->ppn(paddr);
         pte->template fit<sz>();
-        if (!(prot & PROT_IO))
-            pte->reserved = 0x180; // T-Head Extension C & B
+         // T-Head Extension Cachable & Bufferable
+        if (_variant == VARIANT_THEAD_C906)
+        {
+            if (!(prot & PROT_IO))
+                pte->reserved = 0x180;
+        }
         // printf("Now PTE value: %lx\n", *(uintptr_t *)pte);
         return 0;
     }
@@ -618,6 +623,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
   private:
     pte_t *_ptes; // Root level page table
+    int _variant;
 };
 
 using SV39MMU = RV64MMU<39>;
