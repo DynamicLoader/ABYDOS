@@ -93,7 +93,7 @@ class GenericCPU : public SysCPU
 
         // interrupt controller not handled for now
         _cpus.push_back(cpu);
-        
+
         return _hdlcount++;
     }
 

@@ -12,7 +12,7 @@
  */
 
 #include <stdio.h>
-// #include <threads.h>
+#include <malloc.h>
 
 #include "k_defs.h"
 #include "llenv.h"

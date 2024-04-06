@@ -2,7 +2,7 @@
 
 #include "k_main.h"
 
-std::atomic_flag k_malloc_lock = ATOMIC_FLAG_INIT;
+std::atomic_uintptr_t k_malloc_lock = 0;
 
 extern "C"
 {
@@ -44,8 +44,11 @@ extern "C"
         // _write(0,(char*)"mlock\n",6);
         if (k_stage != K_MULTICORE)
             return;
-        while (k_malloc_lock.test_and_set())
-            ;
+        uintptr_t tmp = 0;
+        if(k_malloc_lock == (uintptr_t)reent)
+            return; // recursive lock
+        while (k_malloc_lock.compare_exchange_weak(tmp, (uintptr_t)reent))
+            tmp = 0;
     }
 
     void __malloc_unlock(struct _reent *reent)
@@ -53,7 +56,7 @@ extern "C"
         // _write(0,(char*)"munlock\n",8);
         if (k_stage != K_MULTICORE)
             return;
-        k_malloc_lock.clear();
+        k_malloc_lock = 0;
     }
 
     /**

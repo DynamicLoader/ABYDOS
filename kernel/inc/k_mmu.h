@@ -59,7 +59,6 @@ class RV64MMUBase : public MMUBase
                              "fence.i \n");
                 return false;
             }
-            sfence_vma();
             return true;
         }
         else

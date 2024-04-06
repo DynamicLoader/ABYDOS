@@ -1,2 +1,0 @@
-fatload mmc 0 0x80400000 abydos.ub
-bootm 0x80400000 - 0x80080000

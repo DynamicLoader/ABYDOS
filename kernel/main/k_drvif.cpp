@@ -19,7 +19,7 @@ int DriverManager::probe(const void *fdt, dev_type_t type, int node)
     auto tret = _try(fdt, node, type);
     if (tret < 0)
     {
-        printf("Error while probe node with offset: %i\n", node);
+        // printf("Error while probe node with offset: %i\n", node);
         return -1;
     }
 
@@ -64,7 +64,7 @@ int DriverManager::_try(const void *fdt, int node, dev_type_t type)
     int size;
     prop = fdt_get_property(fdt, node, "compatible", &size);
     const char *compatible = prop ? prop->data : "";
-    printf("Finding driver for #%i %s [%s] ... ", node, node_name, compatible);
+    // printf("Finding driver for #%i %s [%s] ... ", node, node_name, compatible);
     fflush(stdout);
 
     int rc = 0;
@@ -78,11 +78,11 @@ int DriverManager::_try(const void *fdt, int node, dev_type_t type)
 
     if (drv == _drvlist.end())
     {
-        printf("Failed\n");
+        // printf("Failed\n");
         return 0;
     }
 
-    printf("Found! Installing... ");
+    printf("Installing #%i %s [%s]... ",node,node_name,compatible);
     fflush(stdout);
 
     auto hdl = (*drv)->addDevice(fdt, node);

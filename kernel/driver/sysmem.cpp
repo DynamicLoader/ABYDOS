@@ -1,7 +1,7 @@
 /**
  * @file sysmem.cpp
  * @author DynamicLoader
- * @brief UART8250 Driver
+ * @brief SysMem Driver
  * @version 0.1
  * @date 2024-03-11
  *
@@ -13,8 +13,6 @@
 #include <string>
 #include "k_drvif.h"
 #include "k_sysdev.h"
-
-static void drv_register();
 
 class GenericMem : public SysMem
 {

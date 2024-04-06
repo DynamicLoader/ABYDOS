@@ -131,49 +131,6 @@ _start_hang:
 	wfi
 	j	_start_hang
 
-	.section .entry, "ax", %progbits
-	.align 3
-	.globl _exctable
-_exctable:
-	// 0x0 General exception
-	j k_exception_entry
-	.align 2
-	// 0x1 Suprvior software interrupt
-	j k_softirq_entry
-	.align 2
-	// 2 - 4 Reserved
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	// 0x5 Supervisor timer interrupt
-	j k_timer_entry
-	.align 2
-	// 0x6 Supervisor external interrupt
-	j k_extirq_entry
-	.align 2
-	// 0x7 - 0x1F Reserved
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	j _start_hang
-	.align 2
-	// End of exception table
 
 	.section .entry, "ax", %progbits
 	.align 3

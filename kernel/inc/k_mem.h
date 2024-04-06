@@ -3,24 +3,16 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <malloc.h>
 
-template <typename T> inline T *alignedMalloc(size_t size, int alignment)
+template <typename T> T *alignedMalloc(size_t size, size_t alignment)
 {
-    const int pointerSize = sizeof(void *);
-    const int requestedSize = size + alignment - 1 + pointerSize;
-    void *raw = malloc(requestedSize);
-    uintptr_t start = (uintptr_t)raw + pointerSize;
-    void *aligned = (void *)((start + alignment - 1) & ~(alignment - 1));
-    *(void **)((uintptr_t)aligned - pointerSize) = raw;
-    return reinterpret_cast<T *>(aligned);
+    return static_cast<T*>(memalign(alignment, size));
 }
 
 template <typename T> void alignedFree(T *aligned_ptr)
 {
-    if (aligned_ptr)
-    {
-        free(((T **)aligned_ptr)[-1]);
-    }
+    free(aligned_ptr);
 }
 
 inline bool isAligned(void *data, int alignment)

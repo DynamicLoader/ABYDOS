@@ -159,7 +159,7 @@ K_ISR void k_isr_timer()
     auto time = csr_read(CSR_TIME);
     printf("Timer interrupt for hart %i\n", hartid);
     printf("Current Time: %ld\n", time);
-    if (time > 30 * k_cpuclock)
+    if (time > 10 * k_cpuclock)
     {
         SBIF::IPI::sendIPI(-1, 0);
         SBIF::Timer::clearTimer();
@@ -186,30 +186,36 @@ K_ISR void k_esr_ecall(saved_context_t *ctx)
     csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 4);
 }
 
+#define _DUMP_CTX(ctx)                                                                                                 \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        printf("a0 = %lx\n", ctx->a0);                                                                                 \
+        printf("a1 = %lx\n", ctx->a1);                                                                                 \
+        printf("a2 = %lx\n", ctx->a2);                                                                                 \
+        printf("a3 = %lx\n", ctx->a3);                                                                                 \
+        printf("a4 = %lx\n", ctx->a4);                                                                                 \
+        printf("a5 = %lx\n", ctx->a5);                                                                                 \
+        printf("a6 = %lx\n", ctx->a6);                                                                                 \
+        printf("a7 = %lx\n", ctx->a7);                                                                                 \
+        printf("t0 = %lx\n", ctx->t0);                                                                                 \
+        printf("t1 = %lx\n", ctx->t1);                                                                                 \
+        printf("t2 = %lx\n", ctx->t2);                                                                                 \
+        printf("t3 = %lx\n", ctx->t3);                                                                                 \
+        printf("t4 = %lx\n", ctx->t4);                                                                                 \
+        printf("t5 = %lx\n", ctx->t5);                                                                                 \
+        printf("t6 = %lx\n", ctx->t6);                                                                                 \
+        printf("ra = %lx\n", ctx->ra);                                                                                 \
+        printf("gp = %lx\n", ctx->gp);                                                                                 \
+        printf("tp = %lx\n", ctx->tp);                                                                                 \
+        printf("sp = %lx\n",                                                                                           \
+               csr_read(CSR_SSCRATCH) == 0 ? (unsigned long)ctx - sizeof(saved_context_t) : csr_read(CSR_SSCRATCH));   \
+    } while (0)
+
 K_ISR void k_esr_break(saved_context_t *ctx)
 {
     bool volatile conti = false;
     printf("=== Breakpoint at 0x%lx ===\n", csr_read(CSR_SEPC));
-    printf("a0 = %lx\n", ctx->a0);
-    printf("a1 = %lx\n", ctx->a1);
-    printf("a2 = %lx\n", ctx->a2);
-    printf("a3 = %lx\n", ctx->a3);
-    printf("a4 = %lx\n", ctx->a4);
-    printf("a5 = %lx\n", ctx->a5);
-    printf("a6 = %lx\n", ctx->a6);
-    printf("a7 = %lx\n", ctx->a7);
-    printf("t0 = %lx\n", ctx->t0);
-    printf("t1 = %lx\n", ctx->t1);
-    printf("t2 = %lx\n", ctx->t2);
-    printf("t3 = %lx\n", ctx->t3);
-    printf("t4 = %lx\n", ctx->t4);
-    printf("t5 = %lx\n", ctx->t5);
-    printf("t6 = %lx\n", ctx->t6);
-    printf("ra = %lx\n", ctx->ra);
-    printf("gp = %lx\n", ctx->gp);
-    printf("tp = %lx\n", ctx->tp);
-    printf("sp = %lx\n",
-           csr_read(CSR_SSCRATCH) == 0 ? (unsigned long)ctx - sizeof(saved_context_t) : csr_read(CSR_SSCRATCH));
+    _DUMP_CTX(ctx);
     printf("=== Set local variable 'conti' to true to continue ===\n");
     while (!conti)
         ;
@@ -219,26 +225,7 @@ K_ISR void k_esr_break(saved_context_t *ctx)
 K_ISR void k_other_exception(saved_context_t *ctx)
 {
     printf("=== Unhandled exception (%ld) at 0x%lx ===\n", csr_read(CSR_STVAL), csr_read(CSR_SEPC));
-    printf("a0 = %lx\n", ctx->a0);
-    printf("a1 = %lx\n", ctx->a1);
-    printf("a2 = %lx\n", ctx->a2);
-    printf("a3 = %lx\n", ctx->a3);
-    printf("a4 = %lx\n", ctx->a4);
-    printf("a5 = %lx\n", ctx->a5);
-    printf("a6 = %lx\n", ctx->a6);
-    printf("a7 = %lx\n", ctx->a7);
-    printf("t0 = %lx\n", ctx->t0);
-    printf("t1 = %lx\n", ctx->t1);
-    printf("t2 = %lx\n", ctx->t2);
-    printf("t3 = %lx\n", ctx->t3);
-    printf("t4 = %lx\n", ctx->t4);
-    printf("t5 = %lx\n", ctx->t5);
-    printf("t6 = %lx\n", ctx->t6);
-    printf("ra = %lx\n", ctx->ra);
-    printf("gp = %lx\n", ctx->gp);
-    printf("tp = %lx\n", ctx->tp);
-    printf("sp = %lx\n",
-           csr_read(CSR_SSCRATCH) == 0 ? (unsigned long)ctx - sizeof(saved_context_t) : csr_read(CSR_SSCRATCH));
+    _DUMP_CTX(ctx);
     printf("System Hang!\n");
     while (1)
         ;
@@ -332,3 +319,20 @@ K_ISR_ENTRY void k_exception_entry(){
 K_ISR_ENTRY_IMPL(k_softirq_entry, k_isr_softirq)
 K_ISR_ENTRY_IMPL(k_timer_entry, k_isr_timer)
 K_ISR_ENTRY_IMPL(k_extirq_entry, k_isr_extirq)
+
+#define _EXCTABLE_JUMP_HELPER(x) "j " #x " \n.align 2 \n"
+#define _EXCTABLE_JUMP_HELPER2(x) _EXCTABLE_JUMP_HELPER(x) _EXCTABLE_JUMP_HELPER(x)
+#define _EXCTABLE_JUMP_HELPER4(x) _EXCTABLE_JUMP_HELPER2(x) _EXCTABLE_JUMP_HELPER2(x)
+#define _EXCTABLE_JUMP_HELPER8(x) _EXCTABLE_JUMP_HELPER4(x) _EXCTABLE_JUMP_HELPER4(x)
+
+K_ISR_ENTRY __attribute__((aligned(8))) void _exctable()
+{
+    asm volatile(_EXCTABLE_JUMP_HELPER(k_exception_entry) // 0x0 General exception
+                 _EXCTABLE_JUMP_HELPER(k_softirq_entry)   // 0x1 Suprvior software interrupt
+                 _EXCTABLE_JUMP_HELPER(_start_hang) _EXCTABLE_JUMP_HELPER2(_start_hang) // 2 - 4 Reserved
+
+                 _EXCTABLE_JUMP_HELPER(k_timer_entry)  // 0x5 Supervisor timer interrupt
+                 _EXCTABLE_JUMP_HELPER(k_extirq_entry) // 0x6 Supervisor external interrupt
+                 _EXCTABLE_JUMP_HELPER(_start_hang) _EXCTABLE_JUMP_HELPER8(_start_hang) // 0x7 - 0x1F Reserved
+    );
+}
