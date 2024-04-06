@@ -1,5 +1,5 @@
-#ifndef __K_MEM_H__
-#define __K_MEM_H__
+#ifndef __K_MEM_HPP__
+#define __K_MEM_HPP__
 
 #include <cstdint>
 #include <cstdlib>
@@ -7,7 +7,7 @@
 
 template <typename T> T *alignedMalloc(size_t size, size_t alignment)
 {
-    return static_cast<T*>(memalign(alignment, size));
+    return static_cast<T *>(memalign(alignment, size));
 }
 
 template <typename T> void alignedFree(T *aligned_ptr)

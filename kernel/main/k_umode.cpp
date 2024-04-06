@@ -128,6 +128,12 @@ template <uint8_t flen> struct umode_float_ctx_t
     }
 };
 
+template <uint16_t VLEN> struct umode_vector_ctx_t
+{
+    uint32_t v[32 * (VLEN >> 5)];
+    unsigned long vstart, vcsr, vl, vtype; // unsigned long is always XLEN bits
+};
+
 umode_float_ctx_t<64> umode_single_float_ctx;
 
 __attribute__((constructor())) void __()

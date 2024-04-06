@@ -8,7 +8,10 @@
 #include "k_sbif.hpp"
 #include "k_drvif.h"
 #include "k_sysdev.h"
-#include "k_mmu.h"
+#include "k_mem.hpp"
+#include "k_vmmgr.hpp"
+
+std::vector<VMemoryMgr::map_t> VMemoryMgr::_global_maps;
 
 std::function<int(const char *, int size)> k_stdout_func;
 bool k_stdout_switched = false;
@@ -17,6 +20,7 @@ SysRoot *sysroot = nullptr;
 SysCPU *syscpu;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
+VMemoryMgr *sysvmm = nullptr;
 
 volatile unsigned long k_cpuclock = 0;
 
@@ -165,29 +169,20 @@ int k_boot(void **sys_stack_base)
         std::cout << "[E] Unsupported MMU type... Kernel Panic!" << std::endl;
         return K_ENOTSUPP;
     }
+
+    sysvmm = new VMemoryMgr(sysmmu);
     // Lower 4G: Direct mapping
-    rc = sysmmu->map(0, 0, 2 * 1024 * 1048576ULL,
-                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G | MMUBase::PROT_IO);
-    sysmmu->map(2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL,
-                MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+    sysvmm->addMap(0, 0, 2 * 1024 * 1048576ULL,
+                   MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G | MMUBase::PROT_IO);
+    sysvmm->addMap(2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL,
+                   MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+    rc = sysvmm->confirm();
     if (rc < 0)
     {
         std::cout << "[E] Failed to map lower 4G: " << rc << std::endl;
         return K_EFAIL;
     }
-
-    std::cout << std::hex << "SP: " << ({
-        unsigned long __v;
-        asm volatile("mv %0,sp" : "=r"(__v)::"memory");
-        __v;
-    }) << std::dec
-              << std::endl;
-    std::cout << std::hex << "GP: " << ({
-        unsigned long __v;
-        asm volatile("mv %0,gp" : "=r"(__v)::"memory");
-        __v;
-    }) << std::dec
-              << std::endl;
+    
     asm volatile("lla t0,_mmutest \n"
                  "li t1,1 \n"
                  "amoadd.w t2,t1,(t0) \n"
@@ -196,12 +191,10 @@ int k_boot(void **sys_stack_base)
     std::cout << "Enabling MMU..." << std::flush;
     if (!sysmmu->enable(true))
     {
-        // std::cout << "Failed!" << std::endl;
-        printf("Failed!\n");
+        std::cout << "Failed!" << std::endl;
         return K_EFAIL;
     }
-    // std::cout << "OK!" << std::endl;
-    printf("OK!");
+    std::cout << "OK!" << std::endl;
 
     asm volatile("lla t0,_mmutest \n"
                  "li t1,1 \n"
@@ -212,8 +205,9 @@ int k_boot(void **sys_stack_base)
 
     size_t boot_stack_size = K_CONFIG_KERNEL_STACK_SIZE;
     auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
-    rc = sysmmu->map(sysmmu->getVMALowerTop() - boot_stack_size, (uintptr_t)kstack, boot_stack_size,
-                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+    sysvmm->addMap(sysmmu->getVMALowerTop() - boot_stack_size, (uintptr_t)kstack, boot_stack_size,
+                        MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+    rc = sysvmm->confirm();
     if (rc < 0)
     {
         std::cout << "[E] Failed to map global kernel stack: " << rc << std::endl;
@@ -319,8 +313,9 @@ thread_local volatile void *k_local_resume = nullptr;
 // to be run by each hart
 int k_premain(int hartid)
 {
-    if(k_hart_state[hartid] != 1){ // Not desired to be bootup, maybe timeout, or failed
-        while(1)
+    if (k_hart_state[hartid] != 1)
+    { // Not desired to be bootup, maybe timeout, or failed
+        while (1)
             wfi();
     }
 
@@ -359,9 +354,15 @@ void runUserAPP()
         memcpy(dst, &_umode_start, &_umode_end - &_umode_start);
         // For test now, we'd copy a mmu table with different ASID to support Task Scheduling
         auto runaddr = sysmmu->getVMAUpperBottom();
-        sysmmu->map(runaddr, (uintptr_t)dst, len,
+        // sysmmu->map(runaddr, (uintptr_t)dst, len,
+        //             MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
+        // sysmmu->apply();
+        auto vmm = new VMemoryMgr(sysmmu->fork(hartid));
+        vmm->addMap(runaddr, (uintptr_t)dst, len,
                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
-        sysmmu->apply();
+        vmm->confirm();
+        vmm->getMMU()->switchASID();
+        vmm->getMMU()->apply();
 
         // disable interrupt for now
         csr_write(CSR_SSTATUS, (csr_read(CSR_SSTATUS) | SSTATUS_SUM) & ~SSTATUS_SIE &

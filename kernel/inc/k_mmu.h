@@ -2,7 +2,7 @@
 #define __K_MMU_H__
 
 #include "k_sysdev.h"
-#include "k_mem.h"
+#include "k_mem.hpp"
 #include "sbi/riscv_asm.h"
 #include "sbi/riscv_encoding.h"
 
@@ -32,6 +32,14 @@ class MMUBase
     virtual int unmap(uintptr_t vaddr, size_t size) = 0;
 
     virtual void apply() = 0;
+
+    /**
+     * @brief Get a new instance of MMU, not having any mapping
+     * 
+     * @return MMUBase* pointer to new instance
+     */
+    virtual MMUBase* fork(uint16_t asid) = 0;
+    // virtual void setASID(uint16_t asid) = 0;
 
     virtual size_t getVMALowerTop() = 0;
     virtual size_t getVMAUpperBottom() = 0;
@@ -274,6 +282,11 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     {
         printf("Freeing ptes at %lx\n", (uintptr_t)_ptes);
         alignedFree(_ptes);
+    }
+
+    MMUBase* fork(uint16_t asid) override
+    {
+        return new RV64MMU<sz>(asid, _variant);
     }
 
     size_t getVMALowerTop() override

@@ -80,7 +80,9 @@ add_custom_target(AbydOS_KNL_BIN ALL
 )
 
 add_custom_target(abydos.ub ALL
-    COMMAND mkimage -A riscv -O linux -T kernel -C none -e 0x80100000 -a 0x80100000 -d AbydOS.bin abydos.ub
+    COMMAND gzip -f -k AbydOS.bin
+    COMMAND mkimage -A riscv -O linux -T kernel -C gzip -e 0x80100000 -a 0x80100000 -d AbydOS.bin.gz abydos.ub
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     DEPENDS AbydOS_KNL_BIN
+    BYPRODUCTS AbydOS.bin.gz abydos.ub
 )

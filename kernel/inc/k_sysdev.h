@@ -11,6 +11,26 @@
         return pri;                                                                                                    \
     }
 
+class SysScheduler : public DriverBase
+{
+  public:
+    struct task_t
+    {
+        int priority;
+        uintptr_t start;
+    };
+
+    dev_type_t getDeviceType() override
+    {
+        return DEV_TYPE_SYS;
+    }
+
+    virtual uint32_t addTask(long hdl, const task_t &) = 0;
+    virtual int removeTask(long hdl, uint32_t) = 0;
+
+  protected:
+};
+
 class SysRoot : public DriverBase
 {
   public:
@@ -23,12 +43,14 @@ class SysRoot : public DriverBase
     __K_PROP_EXPORT__(model, _model)
     __K_PROP_EXPORT__(stdout_path, _stdout_path)
     __K_PROP_EXPORT__(bootargs, _bootargs)
+    __K_PROP_EXPORT__(scheduler, _scheduler)
 
   protected:
     std::string _compatible;
     std::string _model;
     std::string _stdout_path;
     std::string _bootargs;
+    SysScheduler *_scheduler = nullptr;
 };
 
 // If custom SysMem class is provided in platform, SysRoot should be implemented as well,

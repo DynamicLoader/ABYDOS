@@ -9,6 +9,7 @@
  *
  */
 
+#include <stdexcept>
 #include "k_sysdev.h"
 
 class GenericRoot : public SysRoot
@@ -44,12 +45,39 @@ class GenericRoot : public SysRoot
                 auto prop = fdt_get_property(fdt, rc, "stdout-path", &len);
                 if (prop)
                     _stdout_path = std::string(prop->data);
-                
-                prop = fdt_get_property(fdt, rc, "bootargs", &len);
-                if(prop)
-                    _bootargs = std::string(prop->data);
 
-                DriverManager::markInstalled(fdt, rc, 0, this,DRV_CAP_THIS); // mark as installed
+                prop = fdt_get_property(fdt, rc, "bootargs", &len);
+                if (prop)
+                {
+                    _bootargs = std::string(prop->data);
+                    // Process bootargs
+                    if (_bootargs.find("-use-scheduler-rr") != std::string::npos)
+                    {
+                        auto rc = DriverManager::getDriverByProbe("scheduler-rr", "sys,scheduler");
+                        if (rc)
+                        {
+                            _scheduler = (SysScheduler *)rc;
+                            printf("[Using RoundRobin scheduler] ");
+                        }
+                    }
+                }
+
+                // Fallbacks 
+                if (!_scheduler)
+                {
+                    auto rc = DriverManager::getDriverByProbe(K_CONFIG_DEFAULT_SCHEDULER, "sys,scheduler");
+                    if (rc)
+                    {
+                        _scheduler = (SysScheduler *)rc;
+                        printf("[Using default scheduler = " K_CONFIG_DEFAULT_SCHEDULER "] ");
+                    }
+                    else
+                    {
+                        printf("[E] Default scheduler not found! ");
+                        return K_EINVAL;
+                    }
+                }
+                DriverManager::markInstalled(fdt, rc, 0, this, DRV_CAP_THIS); // mark as installed
 
                 return 0; // singleton device
             }
@@ -60,6 +88,7 @@ class GenericRoot : public SysRoot
 
     void removeDevice(long handler) override
     {
+        throw std::runtime_error("Cannot remove root device");
     }
 };
 
