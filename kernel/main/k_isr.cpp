@@ -6,14 +6,11 @@
 #include "syscall.h"
 #include "k_sbif.hpp"
 
-#define _K_ISR_SP_OFFSET -8
-#define _K_ISR_TP_OFFSET -16
-#define _K_ISR_GP_OFFSET -24
+
 #define SAVE_SPACE (2 + 1 + 3 + 8 + 4)
 #if __riscv_xlen == 64
 #define __REG_SEL(a, b) #a
 #define REG_SIZE 8
-
 #define RISCV_PTR .dword
 #elif __riscv_xlen == 32
 #define __REG_SEL(a, b) #b
@@ -224,8 +221,9 @@ K_ISR void k_esr_break(saved_context_t *ctx)
 
 K_ISR void k_other_exception(saved_context_t *ctx)
 {
-    printf("=== Unhandled exception (%ld) at 0x%lx ===\n", csr_read(CSR_STVAL), csr_read(CSR_SEPC));
+    printf("=== Unhandled exception (0x%lx) at 0x%lx ===\n", csr_read(CSR_SCAUSE), csr_read(CSR_SEPC));
     _DUMP_CTX(ctx);
+    printf("STVAL = %lx\n", csr_read(CSR_STVAL));
     printf("System Hang!\n");
     while (1)
         ;
@@ -253,7 +251,7 @@ K_ISR_ENTRY void k_exception_entry(){
 
         "csrr gp, scause \n"
         "bltz gp, 3f \n" // Highest bit is 1, which means it's an interrupt
-        "li tp, 15 \n"
+        "li tp, 16 \n"
         "bge gp, tp, 2f \n" // Exception code >= 16, not implemented!
         // Calc jump address (in tp)
         "lla tp, 1f \n"
@@ -320,7 +318,7 @@ K_ISR_ENTRY_IMPL(k_softirq_entry, k_isr_softirq)
 K_ISR_ENTRY_IMPL(k_timer_entry, k_isr_timer)
 K_ISR_ENTRY_IMPL(k_extirq_entry, k_isr_extirq)
 
-#define _EXCTABLE_JUMP_HELPER(x) "j " #x " \n.align 2 \n"
+#define _EXCTABLE_JUMP_HELPER(x) ".align 2 \n j " #x " \n"
 #define _EXCTABLE_JUMP_HELPER2(x) _EXCTABLE_JUMP_HELPER(x) _EXCTABLE_JUMP_HELPER(x)
 #define _EXCTABLE_JUMP_HELPER4(x) _EXCTABLE_JUMP_HELPER2(x) _EXCTABLE_JUMP_HELPER2(x)
 #define _EXCTABLE_JUMP_HELPER8(x) _EXCTABLE_JUMP_HELPER4(x) _EXCTABLE_JUMP_HELPER4(x)

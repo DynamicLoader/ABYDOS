@@ -2,13 +2,7 @@
 #ifndef __K_MAIN_H__
 #define __K_MAIN_H__
 
-
-
 #ifdef __cplusplus
-
-#include <functional>
-extern std::function<int(const char *, int size)> k_stdout_func;
-
 extern "C"
 {
 #endif
@@ -32,7 +26,7 @@ extern "C"
 
     extern thread_local _reent hl_reent;
     extern thread_local int hartid;
-    extern thread_local volatile void* k_local_resume;
+    extern thread_local volatile void *k_local_resume;
 
     int k_boot(void **);
     int k_boot_perip();
@@ -44,6 +38,21 @@ extern "C"
 
 #ifdef __cplusplus
 }
+
+#include <functional>
+#include <atomic>
+extern std::function<int(const char *, int size)> k_stdout_func;
+
+#include "k_sysdev.h"
+#include "k_mmu.h"
+#include "k_vmmgr.hpp"
+
+extern std::atomic_int k_hart_state[K_CONFIG_MAX_PROCESSORS];
+extern SysRoot *sysroot;
+extern SysCPU *syscpu;
+extern SysMem *sysmem;
+extern MMUBase *sysmmu;
+extern VMemoryMgr *sysvmm;
 #endif
 
 #endif

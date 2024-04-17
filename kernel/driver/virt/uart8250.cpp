@@ -9,6 +9,7 @@
  *
  */
 
+#include <string_view>
 #include <cstdio>
 #include <string>
 #include <cstdint>
@@ -94,8 +95,8 @@ class Drv_Uart8250 : public DriverChar
         // std::string id = name;
         // if (id.find("uart") == std::string::npos)
         //     return DRV_CAP_NONE;
-        std::string id = compatible;
-        return (id == "ns16550" || id == "ns16550a" || id == "snps,dw-apb-uart") ? DRV_CAP_THIS : DRV_CAP_NONE;
+        using namespace std::string_view_literals;
+        return (compatible == "ns16550"sv || compatible == "ns16550a"sv || compatible == "snps,dw-apb-uart"sv) ? DRV_CAP_THIS : DRV_CAP_NONE;
     }
 
     long addDevice(const void *fdt, int node) override

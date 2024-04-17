@@ -9,6 +9,7 @@
  *
  */
 
+#include <string_view>
 #include <cstdio>
 #include <string>
 #include "k_drvif.h"
@@ -19,7 +20,8 @@ class GenericMem : public SysMem
   public:
     int probe(const char *name, const char *compatible) override
     {
-        std::string id = name;
+        using namespace std::string_view_literals;
+        std::string_view id = name;
         if (id.find("memory") != 0 && id != "reserved-memory")
             return DRV_CAP_NONE;
         return DRV_CAP_COVER;
@@ -27,7 +29,7 @@ class GenericMem : public SysMem
 
     long addDevice(const void *fdt, int node) override
     {
-
+        using namespace std::string_view_literals;
         uint64_t address, size;
         if (!_fdt_rsv_mem_parsed)
         {
@@ -48,7 +50,7 @@ class GenericMem : public SysMem
         }
 
         auto name = fdt_get_name(fdt, node, NULL);
-        if (name == std::string("reserved-memory"))
+        if (name == "reserved-memory"sv)
         {
 
             /* process reserved-memory node */

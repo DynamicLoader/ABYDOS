@@ -9,6 +9,7 @@
  *
  */
 
+#include <string_view>
 #include <stdexcept>
 #include "k_sysdev.h"
 
@@ -17,8 +18,8 @@ class GenericRoot : public SysRoot
   public:
     int probe(const char *name, const char *compatible) override
     {
-        std::string id = name;
-        if (id == "")
+        using namespace std::string_view_literals;
+        if (name == ""sv)
             return DRV_CAP_THIS;
         return DRV_CAP_NONE;
     }

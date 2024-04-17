@@ -24,26 +24,21 @@ SECTIONS
 
 	/* Beginning of the code section */
 
-	.text :
+	.text (READONLY):
 	{
 		PROVIDE(_text_start = .);
 		*(.entry)
 		*(.text)
 		*(.text.*)
 		*(.gcc.*)
+		*(.gcc_except_table)
 		*(.gcc_except_table.*)
 		. = ALIGN(8);
 		PROVIDE(_text_end = .);
 	}
-
-	.umode : {
-		*(.umode.*)
-		. = ALIGN(8);
-	}
-
 	/* . = ALIGN(0x1000); */
 
-	.init_array :
+	.init_array (READONLY):
 	{
 	  PROVIDE_HIDDEN (_init_array_start = .);
 	  KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
@@ -54,7 +49,7 @@ SECTIONS
 	
 	/* . = ALIGN(0x1000); */
 
-	.fini_array :
+	.fini_array (READONLY):
 	{
 	  PROVIDE_HIDDEN (_fini_array_start = .);
 	  KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
@@ -65,7 +60,7 @@ SECTIONS
 
 	/* . = ALIGN(0x1000); */
 
-	.eh_frame :
+	.eh_frame (READONLY):
 	{
 		PROVIDE(__eh_frame_start = .);
 		*(.eh_frame);
@@ -77,7 +72,7 @@ SECTIONS
 	/* . = ALIGN(0x1000); */
 	/* Beginning of the read-only data sections */
 
-	.rodata :
+	.rodata (READONLY):
 	{
 		PROVIDE(_rodata_start = .);
 		*(.rodata .rodata.*)
@@ -93,7 +88,7 @@ SECTIONS
 
 	/* . = ALIGN(0x1000); */
 
-	.tdata :
+	.tdata (READONLY):
 	{
 
 		PROVIDE(_tdata_start = .);
@@ -108,7 +103,8 @@ SECTIONS
 
 	/* In TLS, do not add align 4K, otherwise addressing to tbss will need to add a 4k from $tp which cost much space */
 
-	.tbss : {
+	.tbss (READONLY): 
+	{
 		PROVIDE(_tbss_start = .);
 		*(.tbss)
 		*(.tbss.*)
@@ -120,6 +116,15 @@ SECTIONS
 	PROVIDE(_tls_len = (_tbss_end - _tbss_start) + (_tdata_end - _tdata_start));
 
 	/* . = ALIGN(0x1000); */
+
+	/* .got : 
+	{
+		PROVIDE(_got_start = .);
+		*(.got)
+		*(.got.*)
+		. = ALIGN(8);
+		PROVIDE(_got_end = .);
+	} */
 
 	.data :
 	{
@@ -154,12 +159,30 @@ SECTIONS
 	}
 
 	. = ALIGN(0x1000); /* Need this to create proper sections */
-
 	PROVIDE(_kernel_end = .);
-
+	
+	. = . + _umode_end - _umode_start;
+	
 	/* Provide heap end  */
 	__heap_start__ = .;
     end = __heap_start__;
+
+	_umode_start = 0xffff800000000000;
+	OVERLAY (_umode_start) : AT(_kernel_end) {
+		
+
+		.umode1
+		{
+			*(.umode1.*)
+			. = ALIGN(8);
+		} 
+
+	} 
+	_umode_end = .;
+
+
+
+
 
 	/* . = .+ _KERNEL_STACK_SIZE; */
 

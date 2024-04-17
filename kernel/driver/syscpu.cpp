@@ -1,23 +1,26 @@
 #include "k_sysdev.h"
+#include <string_view>
 
 class GenericCPU : public SysCPU
 {
   public:
     virtual int probe(const char *name, const char *compatible) override
     {
-        if (name == std::string("cpus"))
+        using namespace std::string_view_literals;
+        if (name == "cpus"sv)
             return DRV_CAP_THIS;
-        if (name == std::string("cpu-map") || compatible == std::string("riscv"))
+        if (name == "cpu-map"sv || compatible == "riscv"sv)
             return DRV_CAP_COVER; // also interrupt controller
         return DRV_CAP_NONE;
     }
 
     virtual long addDevice(const void *fdt, int node) override
     {
+        using namespace std::string_view_literals;
         auto name = fdt_get_name(fdt, node, nullptr);
         if (!name)
             return K_EINVAL;
-        if (std::string(name) == "cpus")
+        if (name == "cpus"sv)
         {
             int len = 0;
             auto tbase_freq = fdt_getprop(fdt, node, "timebase-frequency", &len);
@@ -26,7 +29,7 @@ class GenericCPU : public SysCPU
             // printf("CPU Timebase frequency: %ld\n", timebase_freq);
             return 0xFFFF;
         }
-        if (std::string(name) == "cpu-map")
+        if (name == "cpu-map"sv)
         {
             // ignore for now
             return 0xFFF0;
