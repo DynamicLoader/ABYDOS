@@ -14,9 +14,23 @@ class VMemoryMgr
 
     void addMap(uintptr_t vaddr, uintptr_t paddr, size_t size, int prot)
     {
+        // Todo: check compatibility, global mappings sync
         if(prot & MMUBase::PROT_G)
             _global_maps.push_back({vaddr, paddr, size, prot, map_t::MAP});
         _maps.push_back({vaddr, paddr, size, prot, map_t::MAP});
+    }
+
+    void removeMap(uintptr_t vaddr, size_t size, int prot)
+    {
+        auto & mm = (prot & MMUBase::PROT_G) ? _global_maps : _maps;
+        for(auto it = mm.begin(); it != mm.end(); it++)
+        {
+            if(it->vaddr == vaddr && it->size == size)
+            {
+                it->pending = map_t::UNMAP;
+                return;
+            }
+        }
     }
 
     // Actually do the map and unmap, note that we don't call apply() here

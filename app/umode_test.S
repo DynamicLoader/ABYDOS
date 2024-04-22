@@ -6,6 +6,7 @@
 	.globl _umode1_start,_umode1_end
     .option norelax
 _umode1_start:
+    # li ra, 0x100
     li a0, SYSCALL_PRINTF
     lla a1, _umode1_data // Always use lla to avoid GP-relative addressing
     li a2, 114514

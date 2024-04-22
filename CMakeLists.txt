@@ -20,8 +20,8 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 # set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
-set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls")
-set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
+set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls")
+set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
 set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")

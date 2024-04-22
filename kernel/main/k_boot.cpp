@@ -25,6 +25,7 @@ volatile unsigned long k_cpuclock = 0;
 
 // Only write from boot core
 volatile k_stage_t k_stage = K_BEFORE_BOOT;
+std::atomic_int k_hart_state[K_CONFIG_MAX_PROCESSORS] = {0};
 
 int k_boot(void **sys_stack_base)
 {
@@ -301,3 +302,26 @@ int k_boot_harts(int boot_hartid)
     return 0;
 }
 
+void k_before_cleanup()
+{
+    printf("\n> Waiting for other harts to return...\n");
+    int flag = 0;
+    do // a timeout can be added here
+    {
+        flag = 0;
+        for (int i = 0; i < K_CONFIG_MAX_PROCESSORS; ++i)
+        {
+            if (i == hartid)
+                continue;
+            if (k_hart_state[i] == 1 || k_hart_state[i] == 2)
+            {
+                flag = 1;
+                break;
+            }
+            if (k_hart_state[i] == 3 || k_hart_state[i] == 0)
+                continue;
+        }
+    } while (flag);
+    k_stdout_switched = false;
+    k_stage = K_CLEARUP;
+}

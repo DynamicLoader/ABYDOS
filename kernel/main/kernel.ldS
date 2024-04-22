@@ -72,6 +72,15 @@ SECTIONS
 	/* . = ALIGN(0x1000); */
 	/* Beginning of the read-only data sections */
 
+	.got : 
+	{
+		PROVIDE(_got_start = .);
+		*(.got)
+		*(.got.*)
+		. = ALIGN(8);
+		PROVIDE(_got_end = .);
+	}
+
 	.rodata (READONLY):
 	{
 		PROVIDE(_rodata_start = .);
@@ -117,15 +126,6 @@ SECTIONS
 
 	/* . = ALIGN(0x1000); */
 
-	/* .got : 
-	{
-		PROVIDE(_got_start = .);
-		*(.got)
-		*(.got.*)
-		. = ALIGN(8);
-		PROVIDE(_got_end = .);
-	} */
-
 	.data :
 	{
 		PROVIDE(_data_start = .);
@@ -167,10 +167,9 @@ SECTIONS
 	__heap_start__ = .;
     end = __heap_start__;
 
-	_umode_start = 0xffff800000000000;
+	_umode_start = 0xffff800000000000; /* using SV39 for compatiblity */
 	OVERLAY (_umode_start) : AT(_kernel_end) {
 		
-
 		.umode1
 		{
 			*(.umode1.*)

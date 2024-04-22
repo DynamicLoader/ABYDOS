@@ -80,7 +80,7 @@ int k_early_boot(const void *fdt)
 }
 
 // kernel exit
-void k_clearup(int main_ret)
+void k_cleanup(int main_ret)
 {
     // k_stdout_switched = false; // switching back to default stdout
     printf("\nReached k_clearup, clearing up...\n");

@@ -56,17 +56,15 @@ _bss_zero:
 	add	a4, a4, __SIZEOF_POINTER__
 	blt	a4, a5, _bss_zero
 
-_prep_boot:
+_boot:
 	/* Disable and clear all interrupts */
 	csrw	CSR_SIE, zero
 	csrw	CSR_SIP, zero
 
 	/* Setup boot stack */
 	lla	a3, _kernel_end
-	li	a4, K_CONFIG_KERNEL_STACK_SIZE /* this is fake a address provided from ld */
-	add a4, a4, a4 /* double the size */
-	add a4, a4, a4 /* double the size */
-	add a4, a4, a4 /* double the size */
+	li	a4, K_CONFIG_KERNEL_STACK_SIZE
+	slli a4, a4, 3
 	add	sp, a3, a4
 	lla a3, _sys_stack_base
 	REG_S	sp, 0(a3)
@@ -102,24 +100,20 @@ _prep_boot:
 _start_warm:
 
 	mv a0, s0
-	call  	k_premain
-
-	mv 	a0, s0
+	call  	k_pre_main
 	call	k_main
-
-	/* And the last thing: after main */
-
-	mv 	a1, a0
-	mv 	a0, s0
-	call k_after_main
+	call	k_after_main
 
 _kernel_exit:
+	// Wait for other halts to finish
+	call k_before_cleanup
+
 	/* recover to global context */
 	lla a3, _sys_stack_base
 	REG_L sp, 0(a3)
 	mv tp, zero
 
-	call k_clearup
+	call k_cleanup
 
 	/* We don't expect to reach here hence just hang */
 	j	_start_hang
@@ -153,16 +147,24 @@ _start_hart:
 
 	call 	_setup_hart
 
-	call 	k_premain
+	call 	k_pre_main
 
-	mv a0, s0
+	bnez 	a0, _exit_hart
+
 	call	k_main
-
-	# sub a0, zero, s0
-	mv a1, a0
-	li a0, -1
 	call 	k_after_main
 
+_exit_hart:
+
+	// Try to halt the hart
+#define SBI_EXT_HSM				0x48534D
+#define SBI_EXT_HSM_HART_STOP			0x1
+
+	li a7, SBI_EXT_HSM 
+	li a6, SBI_EXT_HSM_HART_STOP
+	ecall
+
+	// Not expected to reach here, but just in case
 	j _start_hang
 
 

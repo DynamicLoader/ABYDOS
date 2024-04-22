@@ -148,6 +148,7 @@ K_ISR void k_isr_softirq()
     {
         csr_write(CSR_SEPC, k_local_resume);
         csr_set(CSR_SSTATUS, SSTATUS_SPP);
+        csr_clear(CSR_SIE,SIP_SSIP);
     }
 }
 
@@ -323,7 +324,7 @@ K_ISR_ENTRY_IMPL(k_extirq_entry, k_isr_extirq)
 #define _EXCTABLE_JUMP_HELPER4(x) _EXCTABLE_JUMP_HELPER2(x) _EXCTABLE_JUMP_HELPER2(x)
 #define _EXCTABLE_JUMP_HELPER8(x) _EXCTABLE_JUMP_HELPER4(x) _EXCTABLE_JUMP_HELPER4(x)
 
-K_ISR_ENTRY __attribute__((aligned(8))) void _exctable()
+K_ISR_ENTRY __attribute__((aligned(4))) void _exctable()
 {
     asm volatile(_EXCTABLE_JUMP_HELPER(k_exception_entry) // 0x0 General exception
                  _EXCTABLE_JUMP_HELPER(k_softirq_entry)   // 0x1 Suprvior software interrupt

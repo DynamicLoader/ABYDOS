@@ -2,7 +2,7 @@
 
 #include "k_sysdev.h"
 
-class SysSchedulerRR : public SysScheduler
+class RoundRobinScheduler : public SysScheduler
 {
   public:
     int probe(const char *name, const char *compatible) override
@@ -64,7 +64,7 @@ class SysSchedulerRR : public SysScheduler
 
 DRV_INSTALL_FUNC(K_PR_DEV_SYSSCHED_END) static void drv_install()
 {
-    static SysSchedulerRR scheduler;
+    static RoundRobinScheduler scheduler;
     DriverManager::addDriver(scheduler);
     printf("Scheduler RoundRobin installed\n");
 }
