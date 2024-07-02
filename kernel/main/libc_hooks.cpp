@@ -1,6 +1,7 @@
 #include <atomic>
 
 #include "k_main.h"
+#include "k_vfs.h"
 
 std::atomic_uintptr_t k_malloc_lock = 0;
 
@@ -12,24 +13,33 @@ extern "C"
     // Hook with libc
     int _write(int fd, char *buf, int size)
     {
-        static int support_dbcn = -1;
-        if (support_dbcn < 0)
-        {
-            support_dbcn = sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_PROBE_EXT, SBI_EXT_DBCN, 0, 0, 0, 0, 0).value;
-        }
-        if (k_stdout_switched)
-            return k_stdout_func(buf, size);
-        if (support_dbcn > 0)
-            sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf, 0, 0, 0, 0);
-        else
-        {
-            for (int i = 0; i < size; i++)
-            {
-                sbi_ecall(SBI_EXT_0_1_CONSOLE_PUTCHAR, 0, buf[i], 0, 0, 0, 0, 0);
-            }
-        }
-        return size;
+        return VirtualFS::write(fd, buf, size);
     }
+
+    int _read(int fd, char* buf, int size){
+        return VirtualFS::read(fd, buf, size);
+    }
+
+    int _close(int fd)
+    {
+        return VirtualFS::close(fd);
+    }
+
+    int _open(const char *path, int flags, int mode)
+    {
+        return VirtualFS::open(path, flags, mode);
+    }
+
+    int _lseek(int fd, off_t offset, int whence)
+    {
+        return VirtualFS::lseek(fd, offset, whence);
+    }
+
+    int _fstat(int fd, struct stat *buf)
+    {
+        return VirtualFS::fstat(fd, buf);
+    }
+
 
     struct _reent *__getreent(void)
     {
@@ -45,7 +55,7 @@ extern "C"
         if (k_stage != K_MULTICORE)
             return;
         uintptr_t tmp = 0;
-        if(k_malloc_lock == (uintptr_t)reent)
+        if (k_malloc_lock == (uintptr_t)reent)
             return; // recursive lock
         while (k_malloc_lock.compare_exchange_weak(tmp, (uintptr_t)reent))
             tmp = 0;
@@ -66,51 +76,7 @@ extern "C"
 #warning Retargetable locking is not enabled. This may result in improper behavior!
 
 #else
-    struct __lock
-    {
-        std::atomic<int> owner = -1;
-        std::atomic<int> recursive_count = 0;
-
-        void lock(bool recursive = false)
-        {
-
-            if (k_stage != K_MULTICORE)
-                return;
-            // _write(0, (char*)"PLOCK\n",6);
-            if (recursive)
-            {
-                if (owner == hartid)
-                {
-                    recursive_count++;
-                    return;
-                }
-            }
-            int null_owner = -1; // helper for compare_exchange_weak
-            while (!owner.compare_exchange_weak(null_owner, hartid))
-                null_owner = -1;
-
-            recursive_count = 1;
-            // _write(0, (char *)"LOCK\n", 5);
-        }
-
-        void unlock(bool recursive = false)
-        {
-            if (k_stage != K_MULTICORE)
-                return;
-            if (recursive)
-            {
-                if (owner == hartid)
-                {
-                    if (--recursive_count == 0)
-                        owner = -1;
-                }
-                return;
-            }
-
-            if (owner == hartid)
-                owner = -1;
-        }
-    };
+    #include "k_lock.h"
 
     struct __lock __lock___sinit_recursive_mutex;
     struct __lock __lock___sfp_recursive_mutex;

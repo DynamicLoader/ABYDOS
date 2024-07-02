@@ -10,6 +10,7 @@
 #include "k_sysdev.h"
 #include "k_mem.hpp"
 #include "k_vmmgr.hpp"
+#include "k_vfs.h"
 
 thread_local _reent hl_reent;
 thread_local int hartid;
@@ -106,6 +107,9 @@ void runUserAPP()
 int k_main()
 {
     printf("Hello from hart %d!\n", hartid);
+
+    VirtualFS::mount("/", "/block/1", 0, 0);
+    VirtualFS::umount("/");
 
     while (!k_halt)
         runUserAPP();

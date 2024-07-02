@@ -30,6 +30,8 @@
 
 // Priority of the driver and global constructors
 #define K_PR_INIT_DRV_LIST 101
+#define K_PR_INIT_FS_LIST 102
+
 
 #define K_PR_DRV_SYSROOT_BEGIN 110
 #define K_PR_DRV_SYSROOT_END 115
@@ -42,6 +44,9 @@
 
 #define K_PR_DEV_SYSSCHED_BEGIN 126
 #define K_PR_DEV_SYSSCHED_END 130
+
+#define K_PR_FS_BEGIN 131
+#define K_PR_FS_END 135
 
 
 #define K_OK 0
