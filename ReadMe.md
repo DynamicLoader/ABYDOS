@@ -26,7 +26,7 @@ Then use CMake to configure and build. If everything goes well, you should get t
 
 **About the Toolchain**:
 
-The package from Ubuntu/Debian does not contain newlib or libstdc++. Therefore, it is required to use a full toolchain that supports them. Toolchains from [riscv-collab](https://github.com/riscv-collab/riscv-gnu-toolchain) are compiled with -mcmodel=medlow by default, which is not compatible with 0x80000000 as the kernel base. I have forked and compiled it with -mcmodel=medany (also other options to get the kernel work) [here](https://github.com/YourCorrectURL/riscv-gnu-toolchain). Just go to the [Actions] for downloading.
+The package from Ubuntu/Debian does not contain newlib or libstdc++. Therefore, it is required to use a full toolchain that supports them. Toolchains from [riscv-collab](https://github.com/riscv-collab/riscv-gnu-toolchain) are compiled with -mcmodel=medlow by default, which is not compatible with 0x80000000 as the kernel base. I have forked and compiled it with -mcmodel=medany (also other options to get the kernel work) [here](https://github.com/dynamicloader/riscv-gnu-toolchain). Just go to the [Actions] for downloading.
 
 **Notes on configuring CMake:**
 

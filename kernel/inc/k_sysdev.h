@@ -44,12 +44,14 @@ class SysRoot : public DriverBase
     __K_PROP_EXPORT__(stdout_path, _stdout_path)
     __K_PROP_EXPORT__(bootargs, _bootargs)
     __K_PROP_EXPORT__(scheduler, _scheduler)
+    __K_PROP_EXPORT__(initrd, _initrd_path)
 
   protected:
     std::string _compatible;
     std::string _model;
     std::string _stdout_path;
     std::string _bootargs;
+    std::string _initrd_path;
     SysScheduler *_scheduler = nullptr;
 };
 

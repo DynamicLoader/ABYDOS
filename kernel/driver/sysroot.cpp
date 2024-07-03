@@ -47,6 +47,38 @@ class GenericRoot : public SysRoot
                 if (prop)
                     _stdout_path = std::string(prop->data);
 
+                prop = fdt_get_property(fdt, rc, "linux,initrd-start", &len); // Just compatible with Linux
+                if (prop)
+                {
+                    size_t t = 0, e = 0;
+                    if (len == 4)
+                    {
+                        t = fdt32_to_cpu(*((fdt32_t *)(prop->data)));
+                    }
+                    if (len == 8)
+                    {
+                        t = fdt64_to_cpu(*((fdt64_t *)(prop->data)));
+                    }
+
+                    prop = fdt_get_property(fdt, rc, "linux,initrd-end", &len); // Just compatible with Linux
+                    if (prop)
+                    {
+                        if (len == 4)
+                        {
+                            e = fdt32_to_cpu(*((fdt32_t *)(prop->data)));
+                        }
+                        if (len == 8)
+                        {
+                            e = fdt64_to_cpu(*((fdt64_t *)(prop->data)));
+                        }
+                    }
+
+                    if (t && e && e > t)
+                    {
+                        _initrd_path = std::to_string(t) + "," + std::to_string(e - t);
+                    }
+                }
+
                 prop = fdt_get_property(fdt, rc, "bootargs", &len);
                 if (prop)
                 {
@@ -63,7 +95,7 @@ class GenericRoot : public SysRoot
                     }
                 }
 
-                // Fallbacks 
+                // Fallbacks
                 if (!_scheduler)
                 {
                     auto rc = DriverManager::getDriverByProbe(K_CONFIG_DEFAULT_SCHEDULER, "sys,scheduler");

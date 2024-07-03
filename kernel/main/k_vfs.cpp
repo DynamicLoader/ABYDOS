@@ -1,15 +1,18 @@
 #include "k_main.h"
 #include "k_vfs.h"
 
-__attribute__((
-    init_priority(K_PR_INIT_FS_LIST))) std::vector<std::tuple<std::string, BasicFS *, VirtualFS::deleteInstanceFunc_t>>
-    VirtualFS::_fs_map;
+/* __attribute__((
+    init_priority(K_PR_INIT_FS_LIST)))  */
+std::map<std::string, std::pair<BasicFS *, VirtualFS::deleteInstanceFunc_t>> VirtualFS::_fs_map;
 
 __attribute__((init_priority(K_PR_INIT_FS_LIST)))
 std::vector<std::tuple<std::string, VirtualFS::newInstanceFunc_t, VirtualFS::deleteInstanceFunc_t>>
     VirtualFS::_fs_factories;
 
 __attribute__((init_priority(K_PR_INIT_FS_LIST))) lock_t VirtualFS::_fs_lock;
+
+std::map<int, std::pair<BasicFS *, int>> VirtualFS::_global_fd_map;
+int VirtualFS::_global_fd_counter = 3; // 0, 1, 2 are reserved for stdin, stdout, stderr of system
 
 int VirtualFS::_write_stdout(const char *buf, int size)
 {

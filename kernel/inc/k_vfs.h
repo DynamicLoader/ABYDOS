@@ -36,6 +36,7 @@ class BasicFS
 
 constexpr int FILE_STDIN = 0;
 constexpr int FILE_STDOUT = 1;
+constexpr int FILE_STDERR = 2;
 
 class VirtualFS
 {
@@ -71,33 +72,108 @@ class VirtualFS
     // POSIX-like functionss
     static int open(const char *path, int flags, int mode)
     {
+        // printf("Open %s", path);
         _fs_lock.lock();
+        BasicFS *fs = nullptr;
+        size_t max_len = 0;
+        for (auto x : _fs_map)
+        {
+            if (std::string_view(path).find(x.first) == 0)
+            {
+                if (max_len < x.first.size())
+                {
+                    max_len = x.first.size();
+                    fs = x.second.first;
+                }
+            }
+        }
+        if (fs)
+        {
+            int ret = fs->open(path+max_len, flags, mode);
+            if (ret >= 0)
+            {
+                auto fd = _global_fd_counter++;
+                _global_fd_map.insert(std::make_pair(fd, std::make_pair(fs, ret)));
+                _fs_lock.unlock();
+                return fd;
+            }
 
+            _fs_lock.unlock();
+            return ret;
+        }
+        // printf("Failed!\n");
         _fs_lock.unlock();
-        return -1;
+        return K_ENOENT;
     }
     static int close(int fd)
     {
-        return -1;
+        _fs_lock.lock();
+        auto it = _global_fd_map.find(fd);
+        if (it != _global_fd_map.end())
+        {
+            int ret = it->second.first->close(it->second.second);
+            if (ret == K_OK)
+                _global_fd_map.erase(it);
+            _fs_lock.unlock();
+            return ret;
+        }
+        _fs_lock.unlock();
+        return K_ENOENT;
     }
     static int read(int fd, void *buf, int count)
     {
-        return -1;
+        if (fd == FILE_STDIN)
+        {
+            // STDIN
+            return 0;
+        }
+
+        _fs_lock.lock();
+        auto it = _global_fd_map.find(fd);
+        _fs_lock.unlock();
+
+        if (it != _global_fd_map.end())
+        {
+            return it->second.first->read(it->second.second, buf, count);
+        }
+
+        return K_ENOENT;
     }
+
     static int write(int fd, const void *buf, int count)
     {
         if (fd == FILE_STDOUT)
         {
             return _write_stdout((const char *)buf, count);
         }
-        else
+
+        _fs_lock.lock();
+        auto it = _global_fd_map.find(fd);
+        _fs_lock.unlock();
+
+        if (it != _global_fd_map.end())
         {
-            return -1;
+            return it->second.first->write(it->second.second, buf, count);
         }
+
+        return K_ENOENT;
     }
+
     static int lseek(int fd, off_t offset, int whence)
     {
-        return -1;
+        if(fd == FILE_STDIN || fd == FILE_STDOUT || fd == FILE_STDERR)
+            return K_ENOTSUPP;
+
+        _fs_lock.lock();
+        auto it = _global_fd_map.find(fd);
+        _fs_lock.unlock();
+        
+        if (it != _global_fd_map.end())
+        {
+            return it->second.first->lseek(it->second.second, offset, whence);
+        }
+
+        return K_ENOENT;
     }
     static int fstat(int fd, struct stat *buf)
     {
@@ -114,7 +190,7 @@ class VirtualFS
                 auto [ret, fs_instance] = std::get<1>(fs)(devicePath);
                 if (ret == K_OK)
                 {
-                    _fs_map.push_back(std::make_tuple(path, fs_instance, std::get<2>(fs)));
+                    _fs_map.insert(std::make_pair(path, std::make_pair(fs_instance, std::get<2>(fs))));
                     _fs_lock.unlock();
                     return 0;
                 }
@@ -132,20 +208,13 @@ class VirtualFS
     static int umount(const char *path) // After unmounting, the FS instance is deleted
     {
         _fs_lock.lock();
-        for (auto it = _fs_map.begin(); it != _fs_map.end(); it++)
+        auto it = _fs_map.find(path);
+        if (it != _fs_map.end())
         {
-            if (std::get<0>(*it) == path)
-            {
-                auto ret = std::get<2>(*it)(std::get<1>(*it)); // destroy the instance
-                if (ret)
-                {
-                    _fs_lock.unlock();
-                    return ret;
-                }
-                _fs_map.erase(it);
-                _fs_lock.unlock();
-                return 0;
-            }
+            it->second.second(it->second.first);
+            _fs_map.erase(it);
+            _fs_lock.unlock();
+            return 0;
         }
         _fs_lock.unlock();
         return K_ENOTSUPP;
@@ -158,10 +227,12 @@ class VirtualFS
     // int closedir(int fd);
 
   private:
-    static std::vector<std::tuple<std::string, BasicFS *, deleteInstanceFunc_t>> _fs_map;
+    static std::map<std::string, std::pair<BasicFS *, deleteInstanceFunc_t>> _fs_map;
     static std::vector<std::tuple<std::string, newInstanceFunc_t, deleteInstanceFunc_t>>
         _fs_factories; // fs-name, new-instance-func, delete-instance-func
     static lock_t _fs_lock;
+    static std::map<int, std::pair<BasicFS *, int>> _global_fd_map;
+    static int _global_fd_counter;
 
     static int _write_stdout(const char *buf, int size);
 };

@@ -9,6 +9,7 @@
 #include "k_sysdev.h"
 #include "k_mem.hpp"
 #include "k_vmmgr.hpp"
+#include "k_vfs.h"
 
 std::vector<VMemoryMgr::map_t> VMemoryMgr::_global_maps;
 
@@ -247,6 +248,22 @@ int k_boot_perip()
             k_stdout_switched = true;
             std::cout << "Hello from local driver!" << std::endl;
         }
+    }
+
+    // Mount rootfs
+    auto rootfs = sysroot->initrd();
+    if (rootfs.empty())
+    {
+        std::cout << "[W] Rootfs not specified!" << std::endl;
+    }else{
+        std::cout << "Mounting rootfs: " << rootfs << std::endl;
+        auto rc = VirtualFS::mount ("/", rootfs.c_str(), 0, 0);
+        if (rc < 0)
+        {
+            std::cout << "[E] Failed to mount rootfs: " << rc << std::endl;
+            return rc;
+        }
+        std::cout << "[I] Rootfs mounted successfully!" << std::endl;
     }
 
     return 0;

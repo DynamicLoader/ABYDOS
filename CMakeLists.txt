@@ -18,7 +18,6 @@ set(CMAKE_STATIC_LINKER_FLAGS " ")
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
-# set(KernelStackSize 0x10000) # also change in test.elf.ldS
 
 set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls")
 set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
@@ -38,8 +37,10 @@ file(GLOB KNL_SRC
     ${CMAKE_SOURCE_DIR}/kernel/driver/*/*.c
     ${CMAKE_SOURCE_DIR}/kernel/driver/*/*.cpp
 
-    # libfdt
-    ${CMAKE_SOURCE_DIR}/deps/libfdt/*.c
+    # dependices
+    ${CMAKE_SOURCE_DIR}/deps/*/*.c
+    ${CMAKE_SOURCE_DIR}/deps/*/*.cpp
+
 
     # test user mode
     ${CMAKE_SOURCE_DIR}/app/*.S
@@ -50,13 +51,15 @@ add_executable(AbydOS_KNL ${KNL_SRC})
 target_include_directories(AbydOS_KNL 
     PUBLIC ${CMAKE_SOURCE_DIR}/kernel/inc
     PUBLIC ${CMAKE_SOURCE_DIR}/deps/libfdt/
+    PUBLIC ${CMAKE_SOURCE_DIR}/deps/libcpio/
+    PUBLIC ${CMAKE_SOURCE_DIR}/deps/
 )
 
 target_compile_options(AbydOS_KNL 
     PUBLIC -mabi=${PL_ABI}
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
-    # PUBLIC -DDEBUG
+    PUBLIC -DDEBUG
 )
 
 target_link_options(AbydOS_KNL
@@ -86,3 +89,5 @@ add_custom_target(abydos.ub ALL
     DEPENDS AbydOS_KNL_BIN
     BYPRODUCTS AbydOS.bin.gz abydos.ub
 )
+
+# echo 2.txt | cpio -o -H newc > 1.cpio

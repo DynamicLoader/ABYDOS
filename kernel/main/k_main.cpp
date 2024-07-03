@@ -3,6 +3,7 @@
 #include <string>
 #include <functional>
 #include <atomic>
+#include <fstream>
 
 #include "k_main.h"
 #include "k_sbif.hpp"
@@ -108,8 +109,21 @@ int k_main()
 {
     printf("Hello from hart %d!\n", hartid);
 
-    VirtualFS::mount("/", "/block/1", 0, 0);
-    VirtualFS::umount("/");
+    std::ifstream f("/2.txt");
+    if(f.is_open())
+    {
+        std::string line;
+        while(getline(f, line))
+        {
+            printf("!!!Reading from 2.txt: %s\n", line.c_str());
+        }
+        f.close();
+    }
+    else
+    {
+        printf("Failed to open file\n");
+    }
+
 
     while (!k_halt)
         runUserAPP();
