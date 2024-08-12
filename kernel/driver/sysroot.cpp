@@ -75,6 +75,8 @@ class GenericRoot : public SysRoot
 
                     if (t && e && e > t)
                     {
+                        t |= 0xFFFFFFC000000000; // Conv to sysmem address
+                        e |= 0xFFFFFFC000000000; // Conv to sysmem address
                         _initrd_path = std::to_string(t) + "," + std::to_string(e - t);
                     }
                 }
@@ -84,13 +86,19 @@ class GenericRoot : public SysRoot
                 {
                     _bootargs = std::string(prop->data);
                     // Process bootargs
-                    if (_bootargs.find("-use-scheduler-rr") != std::string::npos)
+                    auto st = _bootargs.find("-use-scheduler-");
+                    if (st != std::string::npos)
                     {
-                        auto rc = DriverManager::getDriverByProbe("scheduler-rr", "sys,scheduler");
-                        if (rc)
+                        st += 15;
+                        auto end = _bootargs.find(' ', st);
+                        if (end > st)
                         {
-                            _scheduler = (SysScheduler *)rc;
-                            printf("[Using RoundRobin scheduler] ");
+                            auto rc = DriverManager::getDriverByProbe(("scheduler-" + _bootargs.substr(st,end-st)).c_str(), "sys,scheduler");
+                            if (rc)
+                            {
+                                _scheduler = (SysScheduler *)rc;
+                                printf("[Using scheduler = %s] ", _bootargs.substr(st,end).c_str());
+                            }
                         }
                     }
                 }

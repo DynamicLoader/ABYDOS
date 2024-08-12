@@ -25,6 +25,8 @@ set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-
 set(CMAKE_EXE_LINKER_FLAGS " ")
 set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/libelf)
+
 file(GLOB KNL_SRC 
     # kernel
     ${CMAKE_SOURCE_DIR}/kernel/main/*.c
@@ -52,6 +54,7 @@ target_include_directories(AbydOS_KNL
     PUBLIC ${CMAKE_SOURCE_DIR}/kernel/inc
     PUBLIC ${CMAKE_SOURCE_DIR}/deps/libfdt/
     PUBLIC ${CMAKE_SOURCE_DIR}/deps/libcpio/
+    PUBLIC ${CMAKE_SOURCE_DIR}/deps/libelf/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/deps/
 )
 
@@ -60,6 +63,10 @@ target_compile_options(AbydOS_KNL
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
     PUBLIC -DDEBUG
+)
+
+target_link_libraries(AbydOS_KNL
+    PUBLIC elf
 )
 
 target_link_options(AbydOS_KNL

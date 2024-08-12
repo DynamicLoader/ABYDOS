@@ -24,7 +24,7 @@ int VirtualFS::_write_stdout(const char *buf, int size)
     if (k_stdout_switched)
         return k_stdout_func(buf, size);
     if (support_dbcn > 0)
-        sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf, 0, 0, 0, 0);
+        sbi_ecall(SBI_EXT_DBCN, SBI_EXT_DBCN_CONSOLE_WRITE, size, (unsigned long)buf & 0xffffffff, 0, 0, 0, 0);
     else
     {
         for (int i = 0; i < size; i++)

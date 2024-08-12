@@ -140,6 +140,7 @@ class Drv_Uart8250 : public DriverChar
         else
             uart.base += default_reg_offset;
 
+        uart.base += 0xFFFFFFC000000000;
         u16 bdiv = 0;
 
         if (uart.baud)

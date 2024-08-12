@@ -8,26 +8,40 @@
  */
 
 OUTPUT_ARCH(riscv)
-ENTRY(_start)
+ENTRY(_entry)
 
+_KERNEL_VADDR_BASE = 0xFFFFFFC000000000;
 _DRAM_BASE = 0x80000000;
 _KERNEL_OFFSET = 0x100000;
+
 
 SECTIONS
 {
 
 	. = _DRAM_BASE + _KERNEL_OFFSET; /* For most case, starting from DDR by previous BL */
-
-	PROVIDE(_kernel_start = .);
-
+	
 	. = ALIGN(0x1000); /* Need this to create proper sections */
 
 	/* Beginning of the code section */
+	PROVIDE(_kernel_start = .);
 
-	.text (READONLY):
+	.entry  (READONLY) :
+	{
+		*(.entry)
+		*(.entry.data)
+		. = ALIGN(64);
+		PROVIDE(_entry_pgtbl_start = .);
+		KEEP(*(.entry.pgtbl.*))
+		PROVIDE(_entry_pgtbl_end = .);
+	}
+
+	. += _KERNEL_VADDR_BASE; 
+
+	.text (READONLY): AT (_text_start - _KERNEL_VADDR_BASE)
 	{
 		PROVIDE(_text_start = .);
-		*(.entry)
+		*(.startup)
+		*(.startup.*)
 		*(.text)
 		*(.text.*)
 		*(.gcc.*)
@@ -38,26 +52,21 @@ SECTIONS
 	}
 	/* . = ALIGN(0x1000); */
 
-	.init_array (READONLY):
+	.cdtors (READONLY):
 	{
 	  PROVIDE_HIDDEN (_init_array_start = .);
 	  KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
 	  KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
 	  . = ALIGN(8);
 	  PROVIDE_HIDDEN (_init_array_end = .);
-	} 
-	
-	/* . = ALIGN(0x1000); */
 
-	.fini_array (READONLY):
-	{
 	  PROVIDE_HIDDEN (_fini_array_start = .);
 	  KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
 	  KEEP (*(.fini_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
 	  . = ALIGN(8);
 	  PROVIDE_HIDDEN (_fini_array_end = .);
 	} 
-
+	
 	/* . = ALIGN(0x1000); */
 
 	.eh_frame (READONLY):
@@ -97,31 +106,6 @@ SECTIONS
 
 	/* . = ALIGN(0x1000); */
 
-	.tdata (READONLY):
-	{
-
-		PROVIDE(_tdata_start = .);
-
-		*(.tdata)
-		*(.tdata.*)
-		. = ALIGN(8);
-		PROVIDE(_tdata_end = .);
-	} 
-
-	/* PROVIDE(_tdata_len = SIZEOF(.tdata)); */
-
-	/* In TLS, do not add align 4K, otherwise addressing to tbss will need to add a 4k from $tp which cost much space */
-
-	.tbss (READONLY): 
-	{
-		PROVIDE(_tbss_start = .);
-		*(.tbss)
-		*(.tbss.*)
-		. = ALIGN(8);
-		PROVIDE(_tbss_end = .);
-		
-	}
-
 	PROVIDE(_tls_len = (_tbss_end - _tbss_start) + (_tdata_end - _tdata_start));
 
 	/* . = ALIGN(0x1000); */
@@ -158,16 +142,46 @@ SECTIONS
 		PROVIDE(_bss_end = .);
 	}
 
+	.tdata (READONLY):
+	{
+
+		PROVIDE(_tdata_start = .);
+
+		*(.tdata)
+		*(.tdata.*)
+		. = ALIGN(8);
+		PROVIDE(_tdata_end = .);
+	} 
+
+	/* In TLS, do not add align 4K, otherwise addressing to tbss will need to add a 4k from $tp which cost much space */
+
+	.tbss (READONLY): 
+	{
+		PROVIDE(_tbss_start = .);
+		*(.tbss)
+		*(.tbss.*)
+		. = ALIGN(8);
+		PROVIDE(_tbss_end = .);
+	}
+
 	. = ALIGN(0x1000); /* Need this to create proper sections */
 	PROVIDE(_kernel_end = .);
+
 	
-	. = . + _umode_end - _umode_start;
+	
+	/* . = . + _umode_end - _umode_start; */
 	
 	/* Provide heap end  */
 	__heap_start__ = .;
     end = __heap_start__;
 
-	_umode_start = 0xffff800000000000; /* using SV39 for compatiblity */
+	/* .other (NOLOAD) :
+	{
+		*(.*)
+		*(.*.*)
+	}  */
+
+	/* _umode_start = 0xffff800000000000; 
 	OVERLAY (_umode_start) : AT(_kernel_end) {
 		
 		.umode1
@@ -177,21 +191,8 @@ SECTIONS
 		} 
 
 	} 
-	_umode_end = .;
-
-
-
-
+	_umode_end = .; */
 
 	/* . = .+ _KERNEL_STACK_SIZE; */
-
-	/* .heap : {
-        
-        _end = end;
-        __end = end;
-        KEEP(*(.heap))
-        __heap_end__ = .;
-        __HeapLimit = __heap_end__;
-    } */
 
 }

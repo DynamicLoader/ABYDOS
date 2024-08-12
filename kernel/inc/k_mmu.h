@@ -35,10 +35,10 @@ class MMUBase
 
     /**
      * @brief Get a new instance of MMU, not having any mapping
-     * 
+     *
      * @return MMUBase* pointer to new instance
      */
-    virtual MMUBase* fork(uint16_t asid) = 0;
+    virtual MMUBase *fork(uint16_t asid) = 0;
     // virtual void setASID(uint16_t asid) = 0;
 
     virtual size_t getVMALowerTop() = 0;
@@ -200,11 +200,10 @@ class RV64MMUBase : public MMUBase
         {
             // this->rsw = 0;
             this->reserved = 0;
-            if constexpr (sz <= 39)
-                this->ppn3 = 0;
-            if constexpr (sz <= 48)
-                this->ppn4 = 0;
-
+            // if constexpr (sz <= 39)
+            //     this->ppn3 = 0;
+            // if constexpr (sz <= 48)
+            //     this->ppn4 = 0;
             return *this;
         }
 
@@ -218,9 +217,18 @@ class RV64MMUBase : public MMUBase
             ppn4 = paddr->ppn4;
         }
 
+        uintptr_t vaddr()
+        {
+            uintptr_t ret = (*((uintptr_t *)this) << 2) & ~((0xFFFUL) /*+ (0xFFUL << 56)*/);
+            if (ret & (1ULL << 55)) // Sign extension
+                ret |= 0xff00000000000000;
+            return ret;
+        }
+
         uintptr_t paddr()
         {
-            return (*((uintptr_t *)this) << 2) & ~((0xFFFUL) + (0xFFUL << 56));
+            uintptr_t ret = (*((uintptr_t *)this) << 2) & ~((0xFFFUL)) & (~0xFFFFFFC000000000UL);
+            return ret;
         }
     };
 
@@ -276,7 +284,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
     {
         _ptes = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
         memset(_ptes, 0, 4096);
-        setPPN((uintptr_t)_ptes);
+        setPPN((uintptr_t)_ptes & ~(0xFFFFFFC000000000));
     }
     ~RV64MMU()
     {
@@ -284,7 +292,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         alignedFree(_ptes);
     }
 
-    MMUBase* fork(uint16_t asid) override
+    MMUBase *fork(uint16_t asid) override
     {
         return new RV64MMU<sz>(asid, _variant);
     }
@@ -529,27 +537,28 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         if (level == 0)
             return _ptes + poff;                    // We have already created the root level
         auto parent = _createPTE(level - 1, vaddr); // Create parent PTE first
-        // printf("Original Parent PTE has value %lx\n", *(uint64_t *)parent);
+        // printf("Original Parent PTE at %p has value %lx\n", parent, *(uint64_t *)parent);
 
         pte_t *thisPTE = nullptr; // This level PTE 's base address
         // printf("Parent PTE.paddr = 0x%lx\n", parent->paddr());
         if (parent->paddr() != 0) // this level already created, get base
         {
-            thisPTE = (pte_t *)(parent->paddr());
+            thisPTE = (pte_t *)((uintptr_t)parent->paddr() + 0xFFFFFFC000000000) ;
         }
         else
         {
             thisPTE = alignedMalloc<pte_t>(512 * sizeof(pte_t), 4096);
+            // printf("Created new PTE at %lx\n", (uintptr_t)thisPTE);
             memset(thisPTE, 0, 4096);
-            parent->ppn((uintptr_t)thisPTE);
+            parent->ppn((uintptr_t)thisPTE & ~(0xFFFFFFC000000000));
             parent->v = 1;
             parent->r = 0;
             parent->w = 0;
             parent->x = 0; // mark as a pointer
             parent->template fit<sz>();
-            // printf("Created new PTE at %lx\n", (uintptr_t)thisPTE);
             // printf("Now Parent PTE has value %lx\n", *(uint64_t *)parent);
         }
+        // printf("Returning PTE at %lx + %lx = %lx\n", (uintptr_t)thisPTE, (uintptr_t)poff, (uintptr_t)(thisPTE + poff));
         return thisPTE + poff;
     }
 
@@ -588,7 +597,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
         if (level < 0)
             return level;
 
-        auto pte = _createPTE(level, vaddr);
+        pte_t *pte = _createPTE(level, vaddr);
         // printf("PTE got: %lx\n", (uintptr_t)pte);
 
         if (pte->v)
@@ -605,7 +614,7 @@ template <uint8_t sz> class RV64MMU : public RV64MMUBase
 
         pte->ppn(paddr);
         pte->template fit<sz>();
-         // T-Head Extension Cachable & Bufferable
+        // T-Head Extension Cachable & Bufferable
         if (_variant == VARIANT_THEAD_C906)
         {
             if (!(prot & PROT_IO))

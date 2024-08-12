@@ -1,3 +1,6 @@
+#ifndef __K_UMODE_H__
+#define __K_UMODE_H__
+
 #include "k_main.h"
 #include "k_defs.h"
 
@@ -46,13 +49,43 @@
     )
 // clang-format on
 
-struct umode_global_ctx_t
+struct saved_context_t
 {
-    unsigned long ra, sp, gp, tp;
+    // important registers
+    unsigned long ra;
+    unsigned long gp;
+    unsigned long tp;
+    // temp registers
+    unsigned long t0;
+    unsigned long t1;
+    unsigned long t2;
+    unsigned long t3;
+    unsigned long t4;
+    unsigned long t5;
+    unsigned long t6;
+    // argument registers
+    unsigned long a0;
+    unsigned long a1;
+    unsigned long a2;
+    unsigned long a3;
+    unsigned long a4;
+    unsigned long a5;
+    unsigned long a6;
+    unsigned long a7;
+};
+
+struct umode_basic_ctx_t
+{
+    unsigned long ra, gp, tp;
     unsigned long t[7];
     unsigned long a[8];
+    // Additional registers to saved_context_t
     unsigned long s[12];
-    unsigned long pc;
+    unsigned long sp, pc;
+
+    operator saved_context_t(){
+        return *(saved_context_t*)this;
+    }
 };
 
 template <uint8_t flen> struct umode_float_ctx_t
@@ -134,10 +167,12 @@ template <uint16_t VLEN> struct umode_vector_ctx_t
     unsigned long vstart, vcsr, vl, vtype; // unsigned long is always XLEN bits
 };
 
-umode_float_ctx_t<64> umode_single_float_ctx;
+// umode_float_ctx_t<64> umode_single_float_ctx;
 
-__attribute__((constructor())) void __()
-{
-    umode_single_float_ctx.save();
-    umode_single_float_ctx.restore();
-}
+// __attribute__((constructor())) void __()
+// {
+//     umode_single_float_ctx.save();
+//     umode_single_float_ctx.restore();
+// }
+
+#endif // __K_UMODE_H__

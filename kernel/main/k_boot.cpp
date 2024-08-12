@@ -116,8 +116,8 @@ int k_boot(void **sys_stack_base)
     else
     {
         // Add reserved memory from DRAM_START to KERNEL_OFFSET
-        extern char _DRAM_BASE, _KERNEL_OFFSET;
-        sysmem->addReservedMem((size_t)&_DRAM_BASE, (size_t)&_KERNEL_OFFSET);
+        // extern char _DRAM_BASE, _KERNEL_OFFSET;
+        // sysmem->addReservedMem((size_t)&_DRAM_BASE, (size_t)&_KERNEL_OFFSET);
         std::cout << "Reserved memory: ";
         for (auto &mem : sysmem->reservedMem())
             std::cout << "(0x" << std::hex << mem.first << " - 0x" << mem.first + mem.second << ") ";
@@ -171,9 +171,9 @@ int k_boot(void **sys_stack_base)
 
     sysvmm = new VMemoryMgr(sysmmu);
     // Lower 4G: Direct mapping
-    sysvmm->addMap(0, 0, 2 * 1024 * 1048576ULL,
+    sysvmm->addMap(0xFFFFFFC000000000, 0, 2 * 1024 * 1048576ULL,
                    MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G | MMUBase::PROT_IO);
-    sysvmm->addMap(2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL,
+    sysvmm->addMap(0xFFFFFFC000000000 + 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL, 2 * 1024 * 1048576ULL,
                    MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
     rc = sysvmm->confirm();
     if (rc < 0)
@@ -182,11 +182,6 @@ int k_boot(void **sys_stack_base)
         return K_EFAIL;
     }
 
-    asm volatile("lla t0,_mmutest \n"
-                 "li t1,1 \n"
-                 "amoadd.w t2,t1,(t0) \n"
-                 "sw t2, (t0) \n" ::
-                     : "memory", "t0", "t1", "t2");
     std::cout << "Enabling MMU..." << std::flush;
     if (!sysmmu->enable(true))
     {
@@ -195,16 +190,9 @@ int k_boot(void **sys_stack_base)
     }
     std::cout << "OK!" << std::endl;
 
-    asm volatile("lla t0,_mmutest \n"
-                 "li t1,1 \n"
-                 "amoadd.w t2,t1,(t0) \n"
-                 "sw t2, (t0) \n" ::
-                     : "memory", "t0", "t1", "t2");
-    printf("Tested.\n");
-
     size_t boot_stack_size = K_CONFIG_KERNEL_STACK_SIZE;
     auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
-    sysvmm->addMap(sysmmu->getVMALowerTop() - boot_stack_size, (uintptr_t)kstack, boot_stack_size,
+    sysvmm->addMap(-4*1024*1048576ULL - boot_stack_size, (uintptr_t)kstack & ~(0xFFFFFFC000000000), boot_stack_size,
                    MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
     rc = sysvmm->confirm();
     if (rc < 0)
@@ -214,7 +202,7 @@ int k_boot(void **sys_stack_base)
     }
     sysmmu->apply();
 
-    *sys_stack_base = (void *)sysmmu->getVMALowerTop();
+    *sys_stack_base = (void*)(-4*1024*1048576ULL) ;
     printf("> Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
     return 0;
 }
@@ -255,9 +243,11 @@ int k_boot_perip()
     if (rootfs.empty())
     {
         std::cout << "[W] Rootfs not specified!" << std::endl;
-    }else{
+    }
+    else
+    {
         std::cout << "Mounting rootfs: " << rootfs << std::endl;
-        auto rc = VirtualFS::mount ("/", rootfs.c_str(), 0, 0);
+        auto rc = VirtualFS::mount("/", rootfs.c_str(), 0, 0);
         if (rc < 0)
         {
             std::cout << "[E] Failed to mount rootfs: " << rc << std::endl;

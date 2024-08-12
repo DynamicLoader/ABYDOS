@@ -3,11 +3,11 @@
 
 #include "k_defs.h"
 #include "k_main.h"
+#include "k_umode.h"
 #include "syscall.h"
 #include "k_sbif.hpp"
 
-
-#define SAVE_SPACE (2 + 1 + 3 + 8 + 4)
+#define SAVE_SPACE 32 // the max space used for saving context
 #if __riscv_xlen == 64
 #define __REG_SEL(a, b) #a
 #define REG_SIZE 8
@@ -53,6 +53,21 @@
         REG_S " a5, " _VSTR(15 * REG_SIZE) "(sp) \n" \
         REG_S " a6, " _VSTR(16 * REG_SIZE) "(sp) \n" \
         REG_S " a7, " _VSTR(17 * REG_SIZE) "(sp) \n" \
+
+#define _K_ISR_SAVE_CONTEXT_ADDITIONAL \
+        REG_S " s0, " _VSTR(18 * REG_SIZE) "(sp) \n" \
+        REG_S " s1, " _VSTR(19 * REG_SIZE) "(sp) \n" \
+        REG_S " s2, " _VSTR(20 * REG_SIZE) "(sp) \n" \
+        REG_S " s3, " _VSTR(21 * REG_SIZE) "(sp) \n" \
+        REG_S " s4, " _VSTR(22 * REG_SIZE) "(sp) \n" \
+        REG_S " s5, " _VSTR(23 * REG_SIZE) "(sp) \n" \
+        REG_S " s6, " _VSTR(24 * REG_SIZE) "(sp) \n" \
+        REG_S " s7, " _VSTR(25 * REG_SIZE) "(sp) \n" \
+        REG_S " s8, " _VSTR(26 * REG_SIZE) "(sp) \n" \
+        REG_S " s9, " _VSTR(27 * REG_SIZE) "(sp) \n" \
+        REG_S " s10, " _VSTR(28 * REG_SIZE) "(sp) \n" \
+        REG_S " s11, " _VSTR(29 * REG_SIZE) "(sp) \n" \
+        
     
 #define _K_ISR_SAVE_RECALC_PTRS \
         "mv tp, sp \n" \
@@ -70,7 +85,7 @@
         "lla gp, __global_pointer$ \n" \
         ".option pop \n" \
 
-#define K_ISR_SAVE_CONTEXT() \
+#define K_ISR_SAVE_CONTEXT_NORMAL() \
     asm volatile( \
         "add sp, sp, -" _VSTR(SAVE_SPACE * REG_SIZE) " \n" \
         REG_S " ra, " _VSTR(0 * REG_SIZE) "(sp) \n" \
@@ -80,7 +95,18 @@
         _K_ISR_SAVE_RECALC_PTRS \
     )
 
-#define K_ISR_RESTORE_CONTEXT(ret) \
+#define K_ISR_SAVE_CONTEXT_ADDITIONAL() \
+    asm volatile( \
+        "add sp, sp, -" _VSTR(SAVE_SPACE * REG_SIZE) " \n" \
+        REG_S " ra, " _VSTR(0 * REG_SIZE) "(sp) \n" \
+        REG_S " gp, " _VSTR(1 * REG_SIZE) "(sp) \n" \
+        REG_S " tp, " _VSTR(2 * REG_SIZE) "(sp) \n" \
+        _K_ISR_SAVE_CONTEXT_NORMAL \
+        _K_ISR_SAVE_CONTEXT_ADDITIONAL \
+        _K_ISR_SAVE_RECALC_PTRS \
+    )
+
+#define K_ISR_RESTORE_CONTEXT_NORMAL() \
     asm volatile( \
         REG_L " ra, " _VSTR(0 * REG_SIZE) "(sp) \n" \
         REG_L " gp, " _VSTR(1 * REG_SIZE) "(sp) \n" \
@@ -100,45 +126,63 @@
         REG_L " a5, " _VSTR(15 * REG_SIZE) "(sp) \n" \
         REG_L " a6, " _VSTR(16 * REG_SIZE) "(sp) \n" \
         REG_L " a7, " _VSTR(17 * REG_SIZE) "(sp) \n" \
-        "add sp, sp, " _VSTR(SAVE_SPACE * REG_SIZE) "\n"  \
+        "add sp, sp, " _VSTR(SAVE_SPACE * REG_SIZE) "\n" /* Stack Balance */ \
+    )
+
+#define K_ISR_RESTORE_CONTEXT_ADDITIONAL() \
+    asm volatile( \
+        REG_L " tp, " _VSTR(31 * REG_SIZE) "(sp) \n"  /* PC */ \
+        "csrw sepc, tp \n" \
+        REG_L " tp, " _VSTR(30 * REG_SIZE) "(sp) \n" /* SP */\
+        "csrw sscratch, tp \n" \
+        REG_L " ra, " _VSTR(0 * REG_SIZE) "(sp) \n" \
+        REG_L " gp, " _VSTR(1 * REG_SIZE) "(sp) \n" \
+        REG_L " tp, " _VSTR(2 * REG_SIZE) "(sp) \n" \
+        REG_L " t0, " _VSTR(3 * REG_SIZE) "(sp) \n" \
+        REG_L " t1, " _VSTR(4 * REG_SIZE) "(sp) \n" \
+        REG_L " t2, " _VSTR(5 * REG_SIZE) "(sp) \n" \
+        REG_L " t3, " _VSTR(6 * REG_SIZE) "(sp) \n" \
+        REG_L " t4, " _VSTR(7 * REG_SIZE) "(sp) \n" \
+        REG_L " t5, " _VSTR(8 * REG_SIZE) "(sp) \n" \
+        REG_L " t6, " _VSTR(9 * REG_SIZE) "(sp) \n" \
+        REG_L " a0, " _VSTR(10 * REG_SIZE) "(sp) \n" \
+        REG_L " a1, " _VSTR(11 * REG_SIZE) "(sp) \n" \
+        REG_L " a2, " _VSTR(12 * REG_SIZE) "(sp) \n" \
+        REG_L " a3, " _VSTR(13 * REG_SIZE) "(sp) \n" \
+        REG_L " a4, " _VSTR(14 * REG_SIZE) "(sp) \n" \
+        REG_L " a5, " _VSTR(15 * REG_SIZE) "(sp) \n" \
+        REG_L " a6, " _VSTR(16 * REG_SIZE) "(sp) \n" \
+        REG_L " a7, " _VSTR(17 * REG_SIZE) "(sp) \n" \
+        REG_L " s0, " _VSTR(18 * REG_SIZE) "(sp) \n" \
+        REG_L " s1, " _VSTR(19 * REG_SIZE) "(sp) \n" \
+        REG_L " s2, " _VSTR(20 * REG_SIZE) "(sp) \n" \
+        REG_L " s3, " _VSTR(21 * REG_SIZE) "(sp) \n" \
+        REG_L " s4, " _VSTR(22 * REG_SIZE) "(sp) \n" \
+        REG_L " s5, " _VSTR(23 * REG_SIZE) "(sp) \n" \
+        REG_L " s6, " _VSTR(24 * REG_SIZE) "(sp) \n" \
+        REG_L " s7, " _VSTR(25 * REG_SIZE) "(sp) \n" \
+        REG_L " s8, " _VSTR(26 * REG_SIZE) "(sp) \n" \
+        REG_L " s9, " _VSTR(27 * REG_SIZE) "(sp) \n" \
+        REG_L " s10, " _VSTR(28 * REG_SIZE) "(sp) \n" \
+        REG_L " s11, " _VSTR(29 * REG_SIZE) "(sp) \n" \
+        "add sp, sp, " _VSTR(SAVE_SPACE * REG_SIZE) "\n" /* Stack Balance */ \
     )
 
 // clang-format on
 
-struct saved_context_t
-{
-    unsigned long ra;
-    unsigned long gp;
-    unsigned long tp;
-    unsigned long t0;
-    unsigned long t1;
-    unsigned long t2;
-    unsigned long t3;
-    unsigned long t4;
-    unsigned long t5;
-    unsigned long t6;
-    unsigned long a0;
-    unsigned long a1;
-    unsigned long a2;
-    unsigned long a3;
-    unsigned long a4;
-    unsigned long a5;
-    unsigned long a6;
-    unsigned long a7;
-};
-
-#define K_ISR_ENTRY_IMPL(name, func)                                                                                   \
+#define K_ISR_ENTRY_IMPL(mode, name, func)                                                                             \
     K_ISR_ENTRY void name()                                                                                            \
     {                                                                                                                  \
         K_ISR_SWITCH_SP();                                                                                             \
-        K_ISR_SAVE_CONTEXT();                                                                                          \
-        asm volatile("call " #func "\n");                                                                              \
-        K_ISR_RESTORE_CONTEXT();                                                                                       \
+        K_ISR_SAVE_CONTEXT_##mode();                                                                                   \
+        asm volatile("mv a0, sp \n"                                                                                    \
+                     "call " #func "\n");                                                                              \
+        K_ISR_RESTORE_CONTEXT_##mode();                                                                                \
         K_ISR_SWITCH_SP();                                                                                             \
         asm volatile("sret");                                                                                          \
     }
 
-K_ISR void k_isr_softirq()
+K_ISR void k_isr_softirq(saved_context_t *ctx)
 {
     printf("Software interrupt for hart %i\n", hartid);
     extern thread_local bool k_halt;
@@ -148,11 +192,13 @@ K_ISR void k_isr_softirq()
     {
         csr_write(CSR_SEPC, k_local_resume);
         csr_set(CSR_SSTATUS, SSTATUS_SPP);
-        csr_clear(CSR_SIE,SIP_SSIP);
+        csr_clear(CSR_SIE, SIP_SSIP);
+        csr_write(CSR_SSCRATCH, 0);
+        printf("Prepare to resume from U-mode\n");
     }
 }
 
-K_ISR void k_isr_timer()
+K_ISR void k_isr_timer(umode_basic_ctx_t *uctx)
 {
     auto time = csr_read(CSR_TIME);
     printf("Timer interrupt for hart %i\n", hartid);
@@ -168,20 +214,21 @@ K_ISR void k_isr_timer()
         printf("Cannot reset timer: %ld\n", rc);
 }
 
-K_ISR void k_isr_extirq()
+K_ISR void k_isr_extirq(saved_context_t *ctx)
 {
     printf("External interrupt for hart %i\n", hartid);
 }
 
-K_ISR void k_esr_ecall(saved_context_t *ctx)
+K_ISR void k_esr_ecall(umode_basic_ctx_t *uctx)
 {
     printf("ECall from U-mode at 0x%lx\n", csr_read(CSR_SEPC));
+    auto ctx = (saved_context_t *)uctx;
     if (ctx->a0 == SYSCALL_PRINTF)
     {
         printf("[UMODE] ");
-        printf((const char *)(ctx->a1), ctx->a2, ctx->a3, ctx->a4); // only for test, not safe at all
+        printf((const char *)(ctx->a1), ctx->a2, ctx->a3, ctx->a4); // only for test, not safe at all!
     }
-    csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 4);
+    uctx->pc += 4; // ECall instruction takes 4 bytes
 }
 
 #define _DUMP_CTX(ctx)                                                                                                 \
@@ -237,7 +284,15 @@ K_ISR_ENTRY void k_exception_entry(){
         "call 4f \n" \
         "mv a0, sp \n" \
         "call " #func " \n" \
-        "j 5f \n"
+        "j 10f \n"
+
+    // used for fully saved context
+    #define _K_EXC_JUMP_HELPER2(func) \
+        ".align 4 \n"  \
+        "call 5f \n" \
+        "mv a0, sp \n" \
+        "call " #func " \n" \
+        "j 11f \n"
 
     #define _K_EXC_NO_HANDLER() \
         ".align 4 \n" \
@@ -272,7 +327,7 @@ K_ISR_ENTRY void k_exception_entry(){
         _K_EXC_JUMP_HELPER(k_other_exception) // 5
         _K_EXC_JUMP_HELPER(k_other_exception) // 6
         _K_EXC_JUMP_HELPER(k_other_exception) // 7
-        _K_EXC_JUMP_HELPER(k_esr_ecall) // 8 - ecall on U-mode
+        _K_EXC_JUMP_HELPER2(k_esr_ecall) // 8 - ecall on U-mode
         _K_EXC_JUMP_HELPER(k_other_exception) // 9
         _K_EXC_JUMP_HELPER(k_other_exception) // 10
         _K_EXC_JUMP_HELPER(k_other_exception) // 11
@@ -304,9 +359,27 @@ K_ISR_ENTRY void k_exception_entry(){
         "ret \n" 
     );
 
+    asm volatile(
+        "5: \n"
+        "add sp, sp, -" _VSTR(SAVE_SPACE * REG_SIZE) " \n" 
+        /* ra, tp , gp already saved, skipped */
+        _K_ISR_SAVE_CONTEXT_NORMAL
+        _K_ISR_SAVE_CONTEXT_ADDITIONAL
+        REG_S " sp, " _VSTR(30 * REG_SIZE) "(sp) \n"
+        "csrr tp, sepc \n"
+        REG_S " tp, " _VSTR(31 * REG_SIZE) "(sp) \n" // PC
+        _K_ISR_SAVE_RECALC_PTRS
+        "ret \n" 
+    );
+
     // Internal routine to restore context
-    asm volatile("5: \n");
-    K_ISR_RESTORE_CONTEXT();
+    asm volatile("10: \n");
+    K_ISR_RESTORE_CONTEXT_NORMAL();
+    K_ISR_SWITCH_SP();
+    asm volatile("sret \n");
+
+    asm volatile("11: \n");
+    K_ISR_RESTORE_CONTEXT_ADDITIONAL();
     K_ISR_SWITCH_SP();
     asm volatile("sret \n");
 
@@ -315,9 +388,9 @@ K_ISR_ENTRY void k_exception_entry(){
 }
 // clang-format on
 
-K_ISR_ENTRY_IMPL(k_softirq_entry, k_isr_softirq)
-K_ISR_ENTRY_IMPL(k_timer_entry, k_isr_timer)
-K_ISR_ENTRY_IMPL(k_extirq_entry, k_isr_extirq)
+K_ISR_ENTRY_IMPL(NORMAL, k_softirq_entry, k_isr_softirq)
+K_ISR_ENTRY_IMPL(ADDITIONAL, k_timer_entry, k_isr_timer)
+K_ISR_ENTRY_IMPL(NORMAL, k_extirq_entry, k_isr_extirq)
 
 #define _EXCTABLE_JUMP_HELPER(x) ".align 2 \n j " #x " \n"
 #define _EXCTABLE_JUMP_HELPER2(x) _EXCTABLE_JUMP_HELPER(x) _EXCTABLE_JUMP_HELPER(x)

@@ -49,55 +49,53 @@ int k_pre_main(int hartid)
     return 0;
 }
 
-void runInUserMode(uintptr_t runaddr)
-{
-    // disable interrupt for now
-    csr_write(CSR_SSTATUS, (csr_read(CSR_SSTATUS) | SSTATUS_SUM) & ~SSTATUS_SIE &
-                               ~SSTATUS_SPP); // permit read U-mode page from S-mode
-    k_local_resume = &&_resume;
+// void runInUserMode(uintptr_t runaddr)
+// {
+//     // disable interrupt for now
+//     csr_write(CSR_SSTATUS, (csr_read(CSR_SSTATUS) | SSTATUS_SUM) & ~SSTATUS_SIE &
+//                                ~SSTATUS_SPP); // permit read U-mode page from S-mode
+//     k_local_resume = &&_resume;
 
-    asm volatile("csrw sscratch, sp \n" //  save sp in sscratch
-                 "csrw sepc, %0 \n"     //  set sepc to the entry
-                 "csrc sstatus, %1 \n"  //  clear SPP
-                 ::"r"(runaddr),
-                 "r"(SSTATUS_SPP)
-                 : "memory");
-    /* Switch to U-mode, while saving the context by compiler */
-    asm volatile("sret" ::
-                     : "memory", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "t0", "t1", "t2", "t3", "t4", "t5",
-                       "t6", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
-                       "ra" /* sp, gp and tp are restored in ISR */);
+//     asm volatile("csrw sscratch, sp \n" //  save sp in sscratch
+//                  "csrw sepc, %0 \n"     //  set sepc to the entry
+//                  "csrc sstatus, %1 \n"  //  clear SPP
+//                  ::"r"(runaddr),
+//                  "r"(SSTATUS_SPP)
+//                  : "memory");
+//     /* Switch to U-mode, while saving the context by compiler */
+//     asm volatile("sret" ::
+//                      : "memory", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "t0", "t1", "t2", "t3", "t4", "t5",
+//                        "t6", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+//                        "ra" /* sp, gp and tp are restored in ISR */);
 
-_resume:
-    asm volatile("csrw sscratch, zero \n" //  clear sscratch
-    );
-    printf("Resume from U-mode!");
-}
+// _resume:
+//     printf("Resume from U-mode!");
+// }
 
-void runUserAPP()
-{
-    extern char __load_start_umode1, __load_stop_umode1;
-    if (!k_local_resume)
-    {
-        size_t dlen = &__load_stop_umode1 - &__load_start_umode1;
-        size_t len = dlen & 0xFFF ? (dlen & ~0xFFFULL) + 0x1000 : dlen;
-        auto dst = alignedMalloc<uint8_t>(len, 4096);
-        memcpy(dst, &__load_start_umode1, dlen);
-        // For test now, we'd copy a mmu table with different ASID to support Task Scheduling
-        auto runaddr = sysmmu->getVMAUpperBottom();
-        // sysmmu->map(runaddr, (uintptr_t)dst, len,
-        //             MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
-        // sysmmu->apply();
-        auto vmm = new VMemoryMgr(sysmmu->fork(hartid));
-        vmm->addMap(runaddr, (uintptr_t)dst, len,
-                    MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
-        vmm->confirm();
-        vmm->getMMU()->switchASID();
-        vmm->getMMU()->apply();
+// void runUserAPP()
+// {
+//     extern char __load_start_umode1, __load_stop_umode1;
+//     if (!k_local_resume)
+//     {
+//         size_t dlen = &__load_stop_umode1 - &__load_start_umode1;
+//         size_t len = dlen & 0xFFF ? (dlen & ~0xFFFULL) + 0x1000 : dlen;
+//         auto dst = alignedMalloc<uint8_t>(len, 4096);
+//         memcpy(dst, &__load_start_umode1, dlen);
+//         // For test now, we'd copy a mmu table with different ASID to support Task Scheduling
+//         auto runaddr = sysmmu->getVMAUpperBottom();
+//         // sysmmu->map(runaddr, (uintptr_t)dst, len,
+//         //             MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
+//         // sysmmu->apply();
+//         auto vmm = new VMemoryMgr(sysmmu->fork(hartid));
+//         vmm->addMap(runaddr, (uintptr_t)dst, len,
+//                     MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_U);
+//         vmm->confirm();
+//         vmm->getMMU()->switchASID();
+//         vmm->getMMU()->apply();
 
-        runInUserMode(runaddr);
-    }
-}
+//         runInUserMode(runaddr);
+//     }
+// }
 
 /**
  * @brief Hart main function
@@ -125,8 +123,8 @@ int k_main()
     }
 
 
-    while (!k_halt)
-        runUserAPP();
+    // while (!k_halt)
+    //     runUserAPP();
 
     return 0;
 }
