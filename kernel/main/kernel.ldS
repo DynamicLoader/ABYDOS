@@ -12,7 +12,7 @@ ENTRY(_entry)
 
 _KERNEL_VADDR_BASE = 0xFFFFFFC000000000;
 _DRAM_BASE = 0x80000000;
-_KERNEL_OFFSET = 0x100000;
+_KERNEL_OFFSET = 0x200000;
 
 
 SECTIONS
@@ -33,6 +33,7 @@ SECTIONS
 		PROVIDE(_entry_pgtbl_start = .);
 		KEEP(*(.entry.pgtbl.*))
 		PROVIDE(_entry_pgtbl_end = .);
+
 	}
 
 	. += _KERNEL_VADDR_BASE; 

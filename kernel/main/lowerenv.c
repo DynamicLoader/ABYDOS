@@ -15,6 +15,7 @@
 #include <malloc.h>
 
 #include "k_defs.h"
+#include "k_main.h"
 #include "llenv.h"
 #include "libfdt.h"
 
@@ -24,6 +25,7 @@ unsigned long k_heap_max = 0;
 
 void *_sbrk(ptrdiff_t incr)
 {
+    // extern int _write(int, char *, int);
     // _write(1, "_sbrk called\n", 14);
 
     extern char end asm("end"); /* Defined by the linker.  */
@@ -50,17 +52,21 @@ void *_sbrk(ptrdiff_t incr)
     return (void *)prev_heap_end;
 }
 
+
 // kernel init
-int k_early_boot(const void *fdt)
+struct sbiret k_boot(int hartid, const void *fdt)
 {
+    struct sbiret ret;
     printf("\n===== Entered Test Kernel =====\n");
 
     // Copy fdt to heap
+    printf("Got FDT at %p with size = %d\n", fdt, fdt_totalsize(fdt));
     k_fdt = malloc(fdt_totalsize(fdt));
     if (!k_fdt)
     {
         printf("Failed to allocate memory for FDT\n");
-        return K_ENOMEM;
+        ret.error = K_ENOMEM;
+        return ret;
     }
     memcpy(k_fdt, fdt, fdt_totalsize(fdt));
 
@@ -70,20 +76,35 @@ int k_early_boot(const void *fdt)
     __register_frame(&__eh_frame_start);
 
     // Call global constructors
-    printf("Calling init_array...\n");
+    printf("> Calling init_array...\n");
     typedef void (*__init_func_ptr)();
     extern __init_func_ptr _init_array_start[0], _init_array_end[0];
     for (__init_func_ptr *func = _init_array_start; func != _init_array_end; func++)
         (*func)();
 
-    return 0;
+    void* this_stack = NULL;
+    ret.error = k_boot_sysdev(hartid, &this_stack);
+    if (ret.error != 0)
+    {
+        printf("!!! Failed during k_boot_sysdev !!!\n");
+        return ret;
+    }
+    ret.error = k_boot_perip();
+    if (ret.error != 0)
+    {
+        printf("!!! Failed during k_boot_perip !!!\n");
+        return ret;
+    }
+
+    ret.value = (unsigned long)this_stack;
+    return ret;
 }
 
 // kernel exit
 void k_cleanup(int main_ret)
 {
     // k_stdout_switched = false; // switching back to default stdout
-    printf("\nReached k_clearup, clearing up...\n");
+    printf("\nReached k_cleanup, cleaning up...\n");
 
     extern void __cxa_finalize(void *f); // in k_cxxabi.cpp
     __cxa_finalize(NULL);

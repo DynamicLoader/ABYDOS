@@ -62,7 +62,7 @@ target_compile_options(AbydOS_KNL
     PUBLIC -mabi=${PL_ABI}
     PUBLIC -march=${PL_ISA}
     PUBLIC -mcmodel=${PL_MDL}
-    PUBLIC -DDEBUG
+    # PUBLIC -DDEBUG
 )
 
 target_link_libraries(AbydOS_KNL
@@ -89,12 +89,20 @@ add_custom_target(AbydOS_KNL_BIN ALL
     DEPENDS AbydOS_KNL
 )
 
+add_custom_target(AbydOS_rootfs ALL
+    COMMAND find -type f | cpio -o -H newc > ${CMAKE_BINARY_DIR}/AbydOS.rootfs
+    COMMAND gzip -9 -f -k ${CMAKE_BINARY_DIR}/AbydOS.rootfs 
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/rootfs
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/AbydOS.rootfs ${CMAKE_BINARY_DIR}/AbydOS.rootfs.gz
+)
+
 add_custom_target(abydos.ub ALL
     COMMAND gzip -f -k AbydOS.bin
-    COMMAND mkimage -A riscv -O linux -T kernel -C gzip -e 0x80100000 -a 0x80100000 -d AbydOS.bin.gz abydos.ub
+    COMMAND cp ${CMAKE_SOURCE_DIR}/image.its ${CMAKE_BINARY_DIR}/image.its
+    COMMAND mkimage -f image.its abydos.ub
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    DEPENDS AbydOS_KNL_BIN
-    BYPRODUCTS AbydOS.bin.gz abydos.ub
+    DEPENDS AbydOS_KNL_BIN AbydOS_rootfs
+    BYPRODUCTS AbydOS.bin.gz abydos.ub image.its
 )
 
 # echo 2.txt | cpio -o -H newc > 1.cpio

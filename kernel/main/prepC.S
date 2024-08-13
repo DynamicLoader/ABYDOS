@@ -28,7 +28,7 @@
 	.section .startup, "ax", %progbits
 	.align 3
 	.globl _start
-_start:
+_start: // func start(s0: hartid, s1: fdt addr)
 	.option push
   	.option norelax
 	lla gp, __global_pointer$
@@ -50,55 +50,42 @@ _boot:
 	csrw	CSR_STVEC, a3
 
 	/* Setup boot stack */
-	lla	a3, _kernel_end
-	li	a4, K_CONFIG_KERNEL_STACK_SIZE
-	slli a4, a4, 3
-	add	sp, a3, a4
-	lla a3, _sys_stack_base
-	REG_S	sp, 0(a3)
+	# lla	a3, _kernel_end
+	# li	a4, K_CONFIG_KERNEL_STACK_SIZE
+	# slli a4, a4, 3
+	# add	sp, a3, a4
+	# lla a3, _sys_stack_base
+	# REG_S	sp, 0(a3)
+	li sp, K_START_STACK_ADDR
 
 	/* Early boot in C */
-	# lla	a3, _boot_a1
-	# REG_L	a0, 0(a3)
-	mv a0, s1
-	call k_early_boot
+	mv a0, s0
+	mv a1, s1
+	call k_boot
 
 	bne a0, zero, _kernel_exit 
 
-	/* Boot stage 1: Start Kernel premain */
-	lla a0, _sys_stack_base
-	call k_boot
-	bne a0, zero, _kernel_exit
-
-	/* save system SATP to be used by other hart */
-	lla 	a3, _sys_satp
-	csrr 	a2, CSR_SATP
-	REG_S 	a2, 0(a3)
-
-	/* Boot Stage 2: setup perips */
-	call k_boot_perip
-	bne a0, zero, _kernel_exit
-
-	mv a0, s0
 	call _setup_hart // setup boot hart first
 
-	/* Boot Stage 3: boot other harts */
+	/* Boot Stage 2: boot other harts */
+	mv a0, s0
 	call k_boot_harts
 
 _start_warm:
 
 	mv a0, s0
 	call  	k_pre_main
+	bnez 	a0, _kernel_exit
 	call	k_main
 	call	k_after_main
 
 _kernel_exit:
-	// Wait for other halts to finish
+	mv s2, a0
 	call k_before_cleanup
+	mv a0, s2
 
 	/* recover to global context */
-	lla a3, _sys_stack_base
-	REG_L sp, 0(a3)
+	li sp, K_START_STACK_ADDR
 	mv tp, zero
 
 	call k_cleanup
@@ -113,9 +100,8 @@ _start_hang:
 
 	.globl _start_hart
 _start_hart:
-	/* a0: hartid a1: reserved */
-	lla   a2, _sys_satp
-	REG_L a2, 0(a2)
+	/* s0: hartid s1: stack base */
+	REG_L a2, -16(s1)
 	csrw  CSR_SATP, a2
 	fence.i 
 	sfence.vma zero, zero
@@ -126,16 +112,11 @@ _start_hart:
  	lla gp, __global_pointer$
   	.option pop
 
-	/* Save a0 and a1 in s0 and s1 */
-	mv s0, a0
-	mv s1, a1
-
+	mv a1, s1
 	call 	_setup_hart
-
+	mv a0, s0
 	call 	k_pre_main
-
 	bnez 	a0, _exit_hart
-
 	call	k_main
 	call 	k_after_main
 
@@ -153,7 +134,7 @@ _exit_hart:
 	j _start_hang
 
 
-_setup_hart:
+_setup_hart: // func setup_hart(a1: stack addr)
 	/* Disable and clear all interrupts */
 	csrw	CSR_SIE, zero
 	csrw	CSR_SIP, zero
@@ -163,11 +144,12 @@ _setup_hart:
 	# csrw	CSR_STVEC, a3
 
 	/* Setup system stack base according to hart_id as offset */
-	lla a3, _sys_stack_base
-	REG_L sp, 0(a3)
-	li  a2, K_CONFIG_STACK_SIZE
-	mul a3, a0, a2
-	sub sp, sp, a3
+	# lla a3, _sys_stack_base
+	# REG_L sp, 0(a3)
+	# li  a2, K_CONFIG_STACK_SIZE
+	# mul a3, a0, a2
+	# sub sp, sp, a3
+	mv sp, a1
 
 _process_tbss:
 	/* Setup tbss */
@@ -211,11 +193,8 @@ _fini_setup_hart:
 	csrw CSR_SSCRATCH, zero
 	ret
 
-	.section .data
+	.section .rodata
 	.align	3
-	.global _sys_stack_base, _mmutest
-_sys_stack_base:
-	RISCV_PTR	0
-_sys_satp:
-	RISCV_PTR	0
-	
+	.global _entry_hart_addr
+_entry_hart_addr:
+	RISCV_PTR	_entry_hart	

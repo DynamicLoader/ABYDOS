@@ -16,6 +16,19 @@
 // END CONFIG
 
 
+#define K_VADDR_BASE_32 0xFFFFFFC0
+#define K_VADDR_BASE_64 (0xFFFFFFC0UL << 32)
+
+#define K_VADDR_BASE K_VADDR_BASE_64
+
+#define K_PADDR_BASE 0x80000000
+#define K_PADDR_OFFSET 0x200000
+
+#define K_START_PADDR (K_PADDR_BASE + K_PADDR_OFFSET)
+#define K_START_VADDR (K_VADDR_BASE + K_START_PADDR)
+
+#define K_START_STACK_ADDR (K_START_VADDR) // We run code on virtual address so just DONOT use physical address here
+
 #ifndef __ASSEMBLER__
 
 #include "sbi/sbi_ecall_interface.h"

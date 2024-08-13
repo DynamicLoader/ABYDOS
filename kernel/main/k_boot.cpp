@@ -21,6 +21,7 @@ SysCPU *syscpu = nullptr;
 SysMem *sysmem = nullptr;
 MMUBase *sysmmu = nullptr;
 VMemoryMgr *sysvmm = nullptr;
+uintptr_t k_stack_base = 0;
 
 volatile unsigned long k_cpuclock = 0;
 
@@ -28,7 +29,7 @@ volatile unsigned long k_cpuclock = 0;
 volatile k_stage_t k_stage = K_BEFORE_BOOT;
 std::atomic_int k_hart_state[K_CONFIG_MAX_PROCESSORS] = {0};
 
-int k_boot(void **sys_stack_base)
+int k_boot_sysdev(int hartid, void **boothart_stack)
 {
     k_stage = K_BOOT;
 #ifdef DEBUG
@@ -190,20 +191,38 @@ int k_boot(void **sys_stack_base)
     }
     std::cout << "OK!" << std::endl;
 
-    size_t boot_stack_size = K_CONFIG_KERNEL_STACK_SIZE;
-    auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
-    sysvmm->addMap(-4*1024*1048576ULL - boot_stack_size, (uintptr_t)kstack & ~(0xFFFFFFC000000000), boot_stack_size,
-                   MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
-    rc = sysvmm->confirm();
-    if (rc < 0)
-    {
-        std::cout << "[E] Failed to map global kernel stack: " << rc << std::endl;
-        return K_EFAIL;
-    }
-    sysmmu->apply();
+    // size_t boot_stack_size = K_CONFIG_KERNEL_STACK_SIZE;
+    // auto kstack = alignedMalloc<void>(boot_stack_size, 4096);
+    // sysvmm->addMap(-4 * 1024 * 1048576ULL - boot_stack_size, (uintptr_t)kstack & ~(0xFFFFFFC000000000),
+    // boot_stack_size,
+    //                MMUBase::PROT_R | MMUBase::PROT_W | MMUBase::PROT_X | MMUBase::PROT_G);
+    // rc = sysvmm->confirm();
+    // if (rc < 0)
+    // {
+    //     std::cout << "[E] Failed to map global kernel stack: " << rc << std::endl;
+    //     return K_EFAIL;
+    // }
+    // sysmmu->apply();
+    // *sys_stack_base = (void *)(-4 * 1024 * 1048576ULL);
 
-    *sys_stack_base = (void*)(-4*1024*1048576ULL) ;
-    printf("> Preparing to set SP: 0x%lx\n", (uintptr_t)*sys_stack_base);
+    size_t boot_stack_size = syscpu->CPUs().size() * K_CONFIG_STACK_SIZE;
+    if (boot_stack_size < 512 * 1024) // Fix me: assume the address below DRAM+K_OFFSET is available for 512K stack
+    {
+        k_stack_base = K_START_STACK_ADDR; // reuse the stack space
+    }
+    else
+    {
+        k_stack_base = (uintptr_t)alignedMalloc<void>(boot_stack_size, 4096);
+        if (!k_stack_base)
+        {
+            std::cout << "[E] Failed to allocate kernel stack!" << std::endl;
+            return K_ENOMEM;
+        }
+        k_stack_base += boot_stack_size;
+    }
+
+    *boothart_stack = (void*)(k_stack_base - hartid * K_CONFIG_STACK_SIZE);
+    printf("> Prepare to set System_SP_Base =  0x%lx\n", (uintptr_t)k_stack_base);
     return 0;
 }
 
@@ -262,7 +281,8 @@ int k_boot_perip()
 int k_boot_harts(int boot_hartid)
 {
     k_stage = K_BOOT_HARTS;
-    extern char _start_hart;
+    extern uintptr_t _entry_hart_addr;
+    extern uintptr_t _start_hart;
     printf("> Booting harts... (Boot hart = %i)\n", boot_hartid);
     auto cpus = syscpu->CPUs();
     for (auto x : cpus)
@@ -275,10 +295,13 @@ int k_boot_harts(int boot_hartid)
             continue;
         if (rc == SBI_HSM_STATE_STOPPED)
         {
-            printf("Starting hart %d...", i);
+            uintptr_t hartstack = k_stack_base - i * K_CONFIG_STACK_SIZE;
+            *(void**)(hartstack - 8) = &_start_hart;
+            sysmmu->getSATP((uintptr_t*)(hartstack - 16));
+            printf("Starting hart %d... with sp = %lx, satp = %lx", i, hartstack, *(uintptr_t*)(hartstack - 16));
             fflush(stdout);
             k_hart_state[i] = 1; // preset to 1
-            rc = SBIF::HSM::startHart(i, (uintptr_t)&_start_hart, 0);
+            rc = SBIF::HSM::startHart(i, _entry_hart_addr, hartstack);
             if (rc < 0)
             {
                 std::cout << "[E] Failed to start hart " << i << ": " << SBIF::getErrorStr(rc) << std::endl;
@@ -311,24 +334,27 @@ int k_boot_harts(int boot_hartid)
 
 void k_before_cleanup()
 {
-    printf("\n> Waiting for other harts to return...\n");
-    int flag = 0;
-    do // a timeout can be added here
+    if (k_stage == K_MULTICORE)
     {
-        flag = 0;
-        for (int i = 0; i < K_CONFIG_MAX_PROCESSORS; ++i)
+        printf("\n> Waiting for other harts to return...\n");
+        int flag = 0;
+        do // a timeout can be added here
         {
-            if (i == hartid)
-                continue;
-            if (k_hart_state[i] == 1 || k_hart_state[i] == 2)
+            flag = 0;
+            for (int i = 0; i < K_CONFIG_MAX_PROCESSORS; ++i)
             {
-                flag = 1;
-                break;
+                if (i == hartid)
+                    continue;
+                if (k_hart_state[i] == 1 || k_hart_state[i] == 2)
+                {
+                    flag = 1;
+                    break;
+                }
+                if (k_hart_state[i] == 3 || k_hart_state[i] == 0)
+                    continue;
             }
-            if (k_hart_state[i] == 3 || k_hart_state[i] == 0)
-                continue;
-        }
-    } while (flag);
+        } while (flag);
+    }
     k_stdout_switched = false;
     k_stage = K_CLEARUP;
 }

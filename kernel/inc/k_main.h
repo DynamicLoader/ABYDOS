@@ -5,7 +5,7 @@
 #ifdef __cplusplus
 extern "C"
 {
-#endif
+
 
 #include <reent.h>
 
@@ -27,8 +27,9 @@ extern "C"
     extern thread_local _reent hl_reent;
     extern thread_local int hartid;
     extern thread_local volatile void *k_local_resume;
+#endif
 
-    int k_boot(void **);
+    int k_boot_sysdev(int, void **);
     int k_boot_perip();
     int k_boot_harts(int);
     void k_before_cleanup();

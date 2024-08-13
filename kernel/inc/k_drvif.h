@@ -107,14 +107,9 @@ class DriverManager
         return nullptr;
     }
 
-  protected:
     // static long find
     static int probe(const void *fdt, dev_type_t type = DEV_TYPE_PERIP, int node = 0);
     static long getDrvByPath(const void *fdt, const char *path, void **drv);
-
-    friend int k_main(int);
-    friend int k_boot(void**);
-    friend int k_boot_perip();
 
   private:
     static std::vector<DriverBase *> _drvlist;
