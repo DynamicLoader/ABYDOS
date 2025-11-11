@@ -60,14 +60,25 @@ struct sbiret k_boot(int hartid, const void *fdt)
     printf("\n===== Entered Test Kernel =====\n");
 
     // Copy fdt to heap
-    printf("Got FDT at %p with size = %d\n", fdt, fdt_totalsize(fdt));
-    k_fdt = malloc(fdt_totalsize(fdt));
-    if (!k_fdt)
+    // printf("Got FDT at %p with size = %d\n", fdt, fdt_totalsize(fdt));
+    // k_fdt = malloc(fdt_totalsize(fdt));
+    // if (!k_fdt)
+    // {
+    //     printf("Failed to allocate memory for FDT\n");
+    //     ret.error = K_ENOMEM;
+    //     return ret;
+    // }
+    struct {
+        uint8_t fdt[48*1024];
+    }* k_bootup_static = (void *)K_BOOTUP_STATIC_ADDR;
+
+    if(fdt_totalsize(fdt) > sizeof(k_bootup_static->fdt))
     {
-        printf("Failed to allocate memory for FDT\n");
+        printf("FDT size too large, the kernel refuse to boot up!\n");
         ret.error = K_ENOMEM;
         return ret;
     }
+    k_fdt = k_bootup_static->fdt;
     memcpy(k_fdt, fdt, fdt_totalsize(fdt));
 
     // init C++ exceptions

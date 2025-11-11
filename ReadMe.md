@@ -7,12 +7,14 @@ AbydOS is a brand new operating system targeting RISC-V64, mainly based on C++.
 - Multi-hart support
 - SV39/SV48/SV57 MMU support
 - DeviceTree-based device probing
+- CPIO as RootFS
 - Under development...
 
 ## Dependencies
 
 - [OpenSBI](https://github.com/riscv-software-src/opensbi)
 - [DTC](https://git.kernel.org/pub/scm/utils/dtc/dtc.git)
+- [libELF, libCPIO](https://github.com/seL4/util_libs)
 
 ## Build
 
@@ -23,6 +25,8 @@ Currently tested on Ubuntu 20.04, with `gcc-riscv64-unknown-elf` and `qemu-syste
 After installing the necessary packages, clone the repo and initialize the submodules.
 
 Then use CMake to configure and build. If everything goes well, you should get the kernel ELF `AbydOS_KNL` and its binary.
+
+Additionally, I had tested it on a C906-based board, so it will also generate U-Boot files (including ramdisk and kernel as a single FIT Image).
 
 **About the Toolchain**:
 
@@ -48,7 +52,7 @@ In VSCODE, it can be done by editing the `settings.json` and add the segment bel
 
 ## Testing
 
-It's not necessary to build OpenSBI for a full installation of QEMU (-bios=default). (But for now we'd use 0x80100000 as kernel start, which does NOT compatible with default 0x80200000) If you don't, please compile it with `PLATFORM=generic FW_JUMP_OFFSET=0x80100000` then run the QEMU using the command in the project directory:
+It's not necessary to build OpenSBI for a full installation of QEMU (-bios=default). If you don't, please compile it with `PLATFORM=generic` then run the QEMU using the command in the project directory:
 
 ```bash
 qemu-system-riscv64 -M virt -m 256M -nographic -bios build/opensbi/build/platform/generic/firmware/fw_jump.elf -kernel build/AbydOS_KNL

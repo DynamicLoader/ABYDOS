@@ -19,11 +19,11 @@ set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 
-set(CMAKE_C_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls")
-set(CMAKE_CXX_FLAGS "-g -Wall -O0 -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
+set(CMAKE_C_FLAGS "-Wall -Og -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls")
+set(CMAKE_CXX_FLAGS " -Wall -Og -Werror -specs=nosys.specs -nostartfiles -fno-stack-protector -fno-strict-aliasing -fomit-frame-pointer -fno-optimize-sibling-calls -fno-rtti ")
 
 set(CMAKE_EXE_LINKER_FLAGS " ")
-set(CMAKE_ASM_FLAGS "-g -Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+set(CMAKE_ASM_FLAGS "-Wall -nostdlib -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/deps/libelf)
 

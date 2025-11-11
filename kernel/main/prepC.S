@@ -50,12 +50,6 @@ _boot:
 	csrw	CSR_STVEC, a3
 
 	/* Setup boot stack */
-	# lla	a3, _kernel_end
-	# li	a4, K_CONFIG_KERNEL_STACK_SIZE
-	# slli a4, a4, 3
-	# add	sp, a3, a4
-	# lla a3, _sys_stack_base
-	# REG_S	sp, 0(a3)
 	li sp, K_START_STACK_ADDR
 
 	/* Early boot in C */
@@ -138,17 +132,9 @@ _setup_hart: // func setup_hart(a1: stack addr)
 	/* Disable and clear all interrupts */
 	csrw	CSR_SIE, zero
 	csrw	CSR_SIP, zero
+	lla	a3, _start_hang
+	csrw	CSR_STVEC, a3
 
-	/* Setup exception vectors */
-	# lla	a3, _start_hang
-	# csrw	CSR_STVEC, a3
-
-	/* Setup system stack base according to hart_id as offset */
-	# lla a3, _sys_stack_base
-	# REG_L sp, 0(a3)
-	# li  a2, K_CONFIG_STACK_SIZE
-	# mul a3, a0, a2
-	# sub sp, sp, a3
 	mv sp, a1
 
 _process_tbss:

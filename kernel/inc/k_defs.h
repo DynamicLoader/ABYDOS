@@ -27,7 +27,9 @@
 #define K_START_PADDR (K_PADDR_BASE + K_PADDR_OFFSET)
 #define K_START_VADDR (K_VADDR_BASE + K_START_PADDR)
 
-#define K_START_STACK_ADDR (K_START_VADDR) // We run code on virtual address so just DONOT use physical address here
+#define K_BOOTUP_STATIC_ADDR (K_START_VADDR - 120*1024) // 120K reserved for bootup static data, 8K gap to stack
+#define K_START_STACK_ADDR (K_START_VADDR - 128*1024) // We run code on virtual address so just DONOT use physical address here
+
 
 #ifndef __ASSEMBLER__
 

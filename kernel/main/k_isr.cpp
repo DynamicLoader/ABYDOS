@@ -67,6 +67,10 @@
         REG_S " s9, " _VSTR(27 * REG_SIZE) "(sp) \n" \
         REG_S " s10, " _VSTR(28 * REG_SIZE) "(sp) \n" \
         REG_S " s11, " _VSTR(29 * REG_SIZE) "(sp) \n" \
+        "csrr tp, sepc \n" \
+        "csrr gp, sscratch \n" \
+        REG_S " gp, " _VSTR(30 * REG_SIZE) "(sp) \n" \
+        REG_S " tp, " _VSTR(31 * REG_SIZE) "(sp) \n" \
         
     
 #define _K_ISR_SAVE_RECALC_PTRS \
@@ -201,8 +205,8 @@ K_ISR void k_isr_softirq(saved_context_t *ctx)
 K_ISR void k_isr_timer(umode_basic_ctx_t *uctx)
 {
     auto time = csr_read(CSR_TIME);
-    printf("Timer interrupt for hart %i\n", hartid);
-    printf("Current Time: %ld\n", time);
+    // printf("Timer interrupt for hart %i\n", hartid);
+    // printf("Current Time: %ld\n", time);
     if (time > 10 * k_cpuclock)
     {
         SBIF::IPI::sendIPI(-1, 0);
@@ -258,12 +262,12 @@ K_ISR void k_esr_ecall(umode_basic_ctx_t *uctx)
 
 K_ISR void k_esr_break(saved_context_t *ctx)
 {
-    bool volatile conti = false;
-    printf("=== Breakpoint at 0x%lx ===\n", csr_read(CSR_SEPC));
-    _DUMP_CTX(ctx);
-    printf("=== Set local variable 'conti' to true to continue ===\n");
-    while (!conti)
-        ;
+    // bool volatile conti = false;
+    // printf("=== Breakpoint at 0x%lx ===\n", csr_read(CSR_SEPC));
+    // _DUMP_CTX(ctx);
+    // printf("=== Set local variable 'conti' to true to continue ===\n");
+    // while (!conti)
+    //     ;
     csr_write(CSR_SEPC, csr_read(CSR_SEPC) + 2);
 }
 
